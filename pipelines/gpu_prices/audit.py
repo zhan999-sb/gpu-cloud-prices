@@ -230,6 +230,7 @@ class Page(HTMLParser):
         self.groups, self.offer_groups, self.summary_quotes, self.summary_strips = [], [], [], []
         self.links, self.h1, self.search_values, self.breadcrumbs, self.outside_values = [], [], {}, [], []
         self.faq_questions=[]
+        self.growth_nodes=[]
         self.table_rows,self.current_row=[],None
         self.feed(text)
         self.close()
@@ -263,7 +264,7 @@ class Page(HTMLParser):
             frame[2].append(data)
         if not any(f[0] in ("script", "style", "head") for f in self.stack):
             self.text += data
-            if re.search(r"[0-9$%]", data) and not any("data-stat" in f[1] or "data-faq" in f[1] or "data-search" in f[1] or f[0] == "time" for f in self.stack):
+            if re.search(r"[0-9$%]", data) and not any("data-growth" in f[1] or "data-stat" in f[1] or "data-faq" in f[1] or "data-search" in f[1] or f[0] == "time" for f in self.stack):
                 self.unmarked.append(data.strip())
 
     def handle_endtag(self, tag):
@@ -271,13 +272,15 @@ class Page(HTMLParser):
             return
         kind, a, chunks = self.stack.pop()
         text = ''.join(chunks)
+        if 'data-growth' in a or kind in {'textarea','style'}:
+            self.growth_nodes.append((kind,a,text))
         if kind=='td' and self.current_row is not None:self.current_row.append(text)
         if kind=='tr':
             if self.current_row:self.table_rows.append(self.current_row)
             self.current_row=None
         if kind=='h1':self.h1.append(text)
         if kind=='summary' and any(f[1].get('class')=='faq' for f in self.stack):self.faq_questions.append(text)
-        if ('data-search' in a or 'data-faq' in a) and any('hidden' in attrs or 'display:none' in attrs.get('style','').replace(' ','') for attrs in [a]+[f[1] for f in self.stack]):raise AuditError('Search/FAQ answers must be visible')
+        if ('data-search' in a or 'data-faq' in a or 'data-growth' in a) and any('hidden' in attrs or 'display:none' in attrs.get('style','').replace(' ','') for attrs in [a]+[f[1] for f in self.stack]):raise AuditError('Audited content must be visible')
         if 'data-search' in a:
             key=a['data-search']
             if key in self.search_values:raise AuditError('Duplicate search content marker: '+key)
@@ -764,11 +767,17 @@ def _audit(conn, out):
     expected_files.update(extra_files)
     html_pages+=seo_counts.pop('extra_html_pages')
     checked+=seo_counts.pop('additional_values_checked')
+    from .audience_audit import audit_audience
+    growth_files,growth_counts=audit_audience(facts,manifest,out,errors,parsed_main)
+    expected_files.update(growth_files)
+    html_pages+=growth_counts.pop('extra_html_pages')
+    seo_counts['noindex_pages']+=growth_counts['embed_pages']
+    checked+=growth_counts.pop('additional_values_checked')
     if set(manifest["files"]) != expected_files:
         errors.append("manifest: missing or unexpected audited files")
     if errors:
         raise AuditError("Statistics audit FAILED (" + str(len(errors)) + " mismatches):\n" + "\n".join(errors[:40]))
-    return {"status": "passed", "html_pages": html_pages, "json_exports": len(facts["exports"]), "values_checked": checked, **seo_counts,
+    return {"status": "passed", "html_pages": html_pages, "json_exports": len(facts["exports"]), "values_checked": checked, **seo_counts, **growth_counts,
             "observation_day": facts["date"], "basis": "current standard/unspecified-region whole-GPU USD; separate types; tax excluded/unknown; A-only exports"}
 
 

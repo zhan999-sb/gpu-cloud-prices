@@ -23,13 +23,14 @@ from .monthly import monthly_quotes
 from .providers.registry import PROVIDERS
 from .partners import surflare
 from .models import category, popular_rank, headline_order, POPULAR, CATEGORIES, model_family
-from . import search
+from . import search, audience
 from .search_specs import PAIRS, REFERENCES, SPECS
 
 DEFAULT_OUT = ROOT / "site_i18n_preview"
 DEFAULT_SITE_BASE_URL = "https://example.pages.dev"
 LOG = logging.getLogger(__name__)
 CSS = Path(__file__).with_name('design.css').read_text(encoding='utf-8')
+CSS += '\n[data-growth="embed"] textarea{display:block;width:100%;max-width:100%;box-sizing:border-box;resize:vertical;font:13px/1.5 ui-monospace,monospace;padding:10px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px}\n'
 PAGE = Template("""<!DOCTYPE html>
 <html lang="$lang" dir="ltr"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
 <meta name="description" content="$description"/><title>$page_title</title>
@@ -45,7 +46,7 @@ $robots$structured<style>$css</style></head>
 <!-- Future affiliate link slot: intentionally empty until reviewed and disclosed. -->
 <div class="affiliate-slot" data-slot="future-affiliate"></div></main>
 <footer><div class="footer-grid"><p>$updated<br/>$generated</p><p>$disclosure</p></div>
-<p>$footer_source</p>$partner_footer<p id="contact">$contact_label <span>&#122;&#104;&#97;&#110;&#57;&#57;&#57; [at] &#116;&#117;&#116;&#97;&#109;&#97;&#105;&#108; [dot] &#99;&#111;&#109;</span> &middot; <a href="$method_path">$method_label</a></p></footer></body></html>
+<p>$footer_source</p><p><a href="$data_path">$data_label</a> · <a href="$feed_path">$feed_label</a></p>$partner_footer<p id="contact">$contact_label <span>&#122;&#104;&#97;&#110;&#57;&#57;&#57; [at] &#116;&#117;&#116;&#97;&#109;&#97;&#105;&#108; [dot] &#99;&#111;&#109;</span> &middot; <a href="$method_path">$method_label</a></p></footer></body></html>
 """)
 
 
@@ -61,7 +62,7 @@ def model_slugs(models) -> dict[str, str]:
     model's unambiguous URL (e.g. 'GPU 2' alongside two variants of 'GPU').
     """
     ordered = sorted(set(models), key=lambda model: (model.casefold(), model))
-    reserved = {"data", "index", "methodology", "404", "robots", "sitemap", "providers", "compare", "social"} | {lang.prefix for lang in LANGUAGES if lang.prefix}
+    reserved = {"data", "embed", "feed", "latest", "index", "methodology", "404", "robots", "sitemap", "providers", "compare", "social"} | {lang.prefix for lang in LANGUAGES if lang.prefix}
     natural = {model_slug(model) for model in ordered}
     used, result = set(reserved), {}
     for model in ordered:
@@ -129,6 +130,8 @@ def _page(title, body, updated, built, *, origin, route, tr, description, struct
                            placeholder=('<p class="notice">' + tr.rich("placeholder", url='<code>' + DEFAULT_SITE_BASE_URL + '</code>') + '</p>') if origin == DEFAULT_SITE_BASE_URL else "",
                            body=body, updated=tr.rich("updated", date=_timestamp(updated, tr, "/page_updated")),
                            generated=tr.rich("generated", date=_timestamp(built, tr, "/built")), css=CSS,
+                           data_path=tr.language.path('/data/'), data_label=tr.html('growth_data_title'),
+                           feed_path=tr.language.path('/feed.xml'), feed_label=tr.html('growth_feed_title'),
                            partner_footer=_partner(tr, compact=True),
                            footer_source=tr.rich("footer_source", source='<a href="' + SOURCE_DOC + '">' + tr.html("source_name") + '</a>'))
 
@@ -372,7 +375,7 @@ def _tier_key(tier):
     return {'A': 'official_api', 'B': 'tier_b', 'C': 'tier_c', 'D': 'link_only'}[tier]
 
 
-def _offer_card(row, path, tr, *, group='offers', model_url=None):
+def _offer_card(row, path, tr, *, group='offers', model_url=None, drop_badge=''):
     """A buyer-scannable offer. Every source/derived number has an audit pointer."""
     o = row
     fractional = _fractional(o)
@@ -388,6 +391,7 @@ def _offer_card(row, path, tr, *, group='offers', model_url=None):
     body += _stat(path+'/gpu_model',o['gpu_model'],'text')+' <small class="allocation">'+allocation+'</small></h3><div class="offer-specs">'
     body += '<div class="offer-badges"><span class="provider-pill"><a href="'+tr.language.path('/providers/'+search.provider_slug(o['provider'])+'/')+'">'+escape(PROVIDERS.get(o['provider'],{}).get('name',o['provider']))+'</a></span>'+_badge(o['price_type'],tr)+_badge('tax_'+o['tax_basis'],tr)
     body += _badge(_tier_key(o['tier']), tr)
+    body += drop_badge
     if o['provider']=='clore':body+=_badge('community_marketplace',tr)
     if o['provider']=='ai_galaxy':body+=_badge('promo_floor_price',tr)
     if region_class(o['region']) in {'edge','restricted'}:body+=_badge(region_class(o['region']),tr)
@@ -567,7 +571,7 @@ def _home(offers, models, slugs, today, coverage, tr, model_data, monthly=()):
             other_started=True
         if key=='legacy':body+='<details class="legacy-gpus" data-model-group="legacy"><summary>'+tr.html('legacy_gpus')+'</summary>'
         else:body+='<section data-model-group="'+key+'"><h3 class="group-heading">'+tr.html('popular_gpus' if key=='popular' else key+'_gpus')+'</h3>'
-        body+='<div class="offer-list cheapest-list">'+''.join(_offer_card(o,p,tr,group='cheapest',model_url=tr.language.path('/'+slugs[o['gpu_model']]+'/')) for p,o in local)+'</div>'
+        body+='<div class="offer-list cheapest-list">'+''.join(_offer_card(o,p,tr,group='cheapest',model_url=tr.language.path('/'+slugs[o['gpu_model']]+'/'),drop_badge=audience.badge(model_data[o['gpu_model']],o,today,tr)) for p,o in local)+'</div>'
         body+='</details>' if key=='legacy' else '</section>'
     body+='</section>'
     if not cheapest:body+='<p class="notice">'+tr.html('empty_today')+'</p>'
@@ -609,6 +613,7 @@ def _model(model, data, today, coverage, tr, origin, route, export_path, export_
     body+='<h2>'+tr.html('history_heading')+'</h2><p>'+tr.html('history_intro')+'</p><p>'+tr.html('history_aggregation_note')+'</p>'
     for kind,series in data['history'].items():
         if series:body+='<h3>'+tr.html(kind)+'</h3>'+_chart(series,kind,tr,base+'/history/'+kind)
+    body+=audience.embed_section(route.strip('/'),origin,tr)
     if export_path:
         body+='<p><a href="'+export_path+'">'+tr.html('download')+'</a></p>'
     if export_data is not None:
@@ -762,6 +767,8 @@ def build_site(store: PriceStore, out: str | Path = DEFAULT_OUT, *, today: str |
             permitted = [o for o in current if o.tier=='A' and o.export_allowed]
             artifact['currency'] = next(iter({o.currency for o in permitted})) if len({o.currency for o in permitted})==1 else 'USD' if not permitted else 'MULTI'
             artifact['latest_collection'] = max((r for r in store.provider_runs().values() if r['provider'] in {o.provider for o in history_rows}),key=lambda r:r['id'],default=None)
+    index=audience.data_index(exports,origin,today,built)
+    feed_items=audience.events({d['gpu_model']:d for d in exports.values()},observed_rows,today,built)
     last_updated = max((r['collected_at'] for r in observed_rows),default=None)
     tracked = sorted({r['provider'] for r in observed_rows})
     site_noindex = sum(d['statistics']['offers'] for d in model_data.values()) < 3
@@ -776,7 +783,13 @@ def build_site(store: PriceStore, out: str | Path = DEFAULT_OUT, *, today: str |
                                                description=description, structured=website, noindex=site_noindex)
         for route in ('/', '/methodology'):
             if not site_noindex:sitemap_entries[lang.path(route)] = (last_updated or built, route)
+        data_route='/data/'
+        data_updated=max((d['last_updated'] for d in exports.values()),default=None)
+        pages[_page_file(lang.path(data_route))]=_page(tr.text('growth_data_title'),audience.data_body(index,tr),data_updated,built,
+            origin=origin,route=data_route,tr=tr,description=tr.text('growth_data_intro'),noindex=not bool(exports))
+        if exports:sitemap_entries[lang.path(data_route)]=(data_updated or built,data_route)
         for model in models:
+            pages[audience.embed_path(slugs[model],lang).lstrip('/')]=audience.embed_page(model,model_data[model],slugs[model],origin,tr)
             route, export_path = '/' + slugs[model] + '/', ('/data/' + slugs[model] + '.json') if model in exportable_models else None
             data = model_data[model]
             title, description, body, dataset = _model(model, data, today, coverage + _provider_coverage(provider_coverage,tr), tr, origin, route, export_path, exports.get(export_path.lstrip('/')) if export_path else None)
@@ -819,7 +832,7 @@ def build_site(store: PriceStore, out: str | Path = DEFAULT_OUT, *, today: str |
                           "description": description, "url": origin + path, "inLanguage": lang.code}
             pages[_page_file(path)] = _page(title, body, last_updated, built, origin=origin, route=route, tr=tr,
                                             description=description, structured=structured, noindex=noindex)
-        counts[lang.code] = sum(1 for filename in pages if filename.startswith(lang.prefix+'/')) if lang.prefix else sum(1 for filename in pages if filename.split('/')[0] not in {l.prefix for l in LANGUAGES if l.prefix})
+        counts[lang.code] = len(models) + (sum(1 for filename in pages if filename.startswith(lang.prefix+'/')) if lang.prefix else sum(1 for filename in pages if not filename.startswith('embed/') and filename.split('/')[0] not in {l.prefix for l in LANGUAGES if l.prefix}))
     namespace, xhtml = "http://www.sitemaps.org/schemas/sitemap/0.9", "http://www.w3.org/1999/xhtml"
     ET.register_namespace("", namespace)
     ET.register_namespace("xhtml", xhtml)
@@ -834,6 +847,10 @@ def build_site(store: PriceStore, out: str | Path = DEFAULT_OUT, *, today: str |
              "og.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630"><rect width="1200" height="630" fill="#10223e"/><path d="M80 470V330h55v140zm85 0V240h55v230zm85 0V150h55v320z" fill="#83b5ff"/><text x="370" y="280" fill="white" font-family="system-ui,sans-serif" font-size="64">GPU Price Index</text><text x="370" y="355" fill="#a8b8cf" font-family="system-ui,sans-serif" font-size="30">Multi-provider / GPU / USD</text></svg>',
              "sitemap.xml": '<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(sitemap, encoding="unicode") + '\n',
              "robots.txt": 'User-agent: *\nAllow: /\n\nSitemap: ' + origin + '/sitemap.xml\n'+''.join('Sitemap: '+origin+'/sitemap-'+l.code+'.xml\n' for l in LANGUAGES)}
+    other['_headers']=audience.embed_headers()
+    other['data/latest.json']=json.dumps(index,ensure_ascii=False,indent=2,allow_nan=False)+'\n'
+    for lang in LANGUAGES:
+        other[lang.path('/feed.xml').lstrip('/')]=audience.feed(feed_items,slugs,origin,today,catalogs[lang.code])
     # Per-language sitemap files contain exactly their indexable HTML URLs.
     for lang in LANGUAGES:
         localized=ET.Element('{'+namespace+'}urlset')

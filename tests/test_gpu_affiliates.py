@@ -204,7 +204,8 @@ def test_affiliate_providers_and_monthly_prices_in_all_eight_languages(affiliate
         for key in ('novita','gpuoncloud','hyperbolic'):
             assert 'data-provider-link="'+key+'"' in content
         assert 'data-provider-link="cloudclusters"' in content and 'nofollow noopener' in content
-    assert not list((out/'data').glob('*.json'))
+    assert [p.name for p in (out/'data').glob('*.json')] == ['latest.json']
+    assert json.loads((out/'data/latest.json').read_text(encoding='utf-8'))['exports'] == []
 
 
 @pytest.mark.parametrize('old,new',[('$359.00','$0.01'),('>24</span>','>1</span>'),('nofollow noopener','sponsored nofollow noopener'),('data-monthly-quote="0"','data-monthly-quote="999"')])

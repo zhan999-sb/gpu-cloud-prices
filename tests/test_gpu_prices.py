@@ -344,7 +344,7 @@ def test_site_from_fixtures_cheapest_html_json_and_history(tmp_path):
                       offer(collected_at="2026-11-11T08:00:00Z", price_per_hour=40, price_per_gpu_hour=5)])
         store.record_run(provider="azure", started_at=STAMP, status="limited", pages=3, records=3)
         result = build_site(store, tmp_path, today=TODAY, built_at=STAMP)
-    assert result["offers_today"] == 2 and result["html_pages"] == 9 * len(LANGUAGES)
+    assert result["offers_today"] == 2 and result["html_pages"] == 11 * len(LANGUAGES)
     index = (tmp_path / "index.html").read_text(encoding="utf-8")
     assert '/statistics/cheapest/on_demand" data-format="money">$3.00</span>' in index
     assert '/statistics/cheapest/spot" data-format="money">$1.00</span>' in index
@@ -370,6 +370,10 @@ def test_site_from_fixtures_cheapest_html_json_and_history(tmp_path):
         assert all(attrs.get("type") in {"application/ld+json", "module"} and "src" not in attrs
                    for tag, attrs in parser.links if tag == "script")
         relative = path.relative_to(tmp_path).parts
+        if relative[0] == 'embed':
+            assert len(content.encode('utf-8')) < 15_000
+            assert 'content="noindex"' in content and not any(tag=='script' for tag,_ in parser.links)
+            continue
         lang = next((lang for lang in LANGUAGES if lang.prefix and lang.prefix == relative[0]), LANGUAGES[0])
         catalog = load_catalogs()[lang.code]
         assert f'<html lang="{lang.code}" dir="ltr">' in content and 'id="main"' in content
@@ -446,6 +450,9 @@ def test_surflare_partner_placement_localization_and_numeric_audit(tmp_path):
         store.upsert([offer()])
         build_site(store, tmp_path, today=TODAY, built_at=STAMP)
         for path in tmp_path.rglob('*.html'):
+            if path.relative_to(tmp_path).parts[0]=='embed':
+                assert partner['url'] not in path.read_text(encoding='utf-8')
+                continue
             text = path.read_text(encoding='utf-8')
             lang = next(lang for lang in LANGUAGES if f'<html lang="{lang.code}"' in text)
             tr = catalogs[lang.code]
@@ -630,7 +637,7 @@ def test_seo_sharing_structured_data_and_sitemap(tmp_path):
     sitemap = ET.fromstring((tmp_path / "sitemap.xml").read_text(encoding="utf-8"))
     urls = {entry.find("s:loc", namespace).text: entry.find("s:lastmod", namespace).text for entry in sitemap}
     assert urls == {origin + lang.path(route): TODAY for lang in LANGUAGES
-                    for route in ("/", "/methodology", "/h100-sxm-80gb/", "/providers/azure/")}
+                    for route in ("/", "/methodology", "/data/", "/h100-sxm-80gb/", "/providers/azure/")}
     assert set(result["sitemap_urls"]) == set(urls)
     assert (tmp_path / "robots.txt").read_text() == f"User-agent: *\nAllow: /\n\nSitemap: {origin}/sitemap.xml\n"+''.join(f'Sitemap: {origin}/sitemap-{l.code}.xml\n' for l in LANGUAGES)
     assert "Page not found" in (tmp_path / "404.html").read_text(encoding="utf-8")
@@ -802,11 +809,11 @@ def local_target(root, url):
 def assert_multilingual_site(root, origin, models):
     """Audit every generated page, including noindex models and all 404s."""
     catalogs = load_catalogs()
-    routes = {"/", "/methodology", "/404.html"} | {"/" + slug + "/" for slug in models.values()}
+    routes = {"/", "/methodology", "/404.html", "/data/"} | {"/" + slug + "/" for slug in models.values()}
     from pipelines.gpu_prices.search_specs import PAIRS
     routes |= ({'/providers/azure/'} if models else set()) | {'/compare/'+slug+'/' for slug in PAIRS}
     all_pages = {origin + lang.path(route): (lang, route) for lang in LANGUAGES for route in routes}
-    assert len(list(root.rglob("*.html"))) == len(all_pages)
+    assert len(list(root.rglob("*.html"))) == len(all_pages) + len(models) * len(LANGUAGES)
     parsed, metadata, contact_bytes = {}, {}, set()
     original_contact = (b'<span>&#122;&#104;&#97;&#110;&#57;&#57;&#57; [at] '
                         b'&#116;&#117;&#116;&#97;&#109;&#97;&#105;&#108; [dot] '
@@ -903,12 +910,13 @@ def test_every_language_page_reciprocal_metadata_links_sitemap_and_contact(tmp_p
         store.record_run(provider="azure", started_at=STAMP, status="limited", pages=3, records=6)
         result = build_site(store, tmp_path, today=TODAY, built_at=STAMP)
     assert_multilingual_site(tmp_path, origin, model_slugs(names))
-    assert result["html_pages_by_language"] == {lang.code: 12 for lang in LANGUAGES}
-    assert len(list((tmp_path / "data").glob("*.json"))) == len(names)
+    assert result["html_pages_by_language"] == {lang.code: 17 for lang in LANGUAGES}
+    assert len(list((tmp_path / "data").glob("*.json"))) == len(names) + 1
     catalogs = load_catalogs()
     for lang in LANGUAGES:
         if lang.prefix:
-            assert not (tmp_path / lang.prefix / "data").exists()
+            assert (tmp_path / lang.prefix / 'data/index.html').is_file()
+            assert not list((tmp_path / lang.prefix / 'data').glob('*.json'))
         content = (tmp_path / lang.prefix / "a100-80gb/index.html").read_text(encoding="utf-8")
         assert '$1.23' in content and '$1,23' not in content
         page = Metadata(content)
@@ -948,7 +956,8 @@ def test_language_prefixes_reserved_and_multilingual_cleanup(tmp_path):
             assert (tmp_path / lang.prefix / slug / "index.html").is_file()
     with PriceStore(":memory:") as store:
         build_site(store, tmp_path, today=TODAY, built_at=STAMP)
-    assert not list((tmp_path / "data").glob("*.json"))
+    assert [p.name for p in (tmp_path / 'data').glob('*.json')] == ['latest.json']
+    assert json.loads((tmp_path/'data/latest.json').read_text(encoding='utf-8'))['exports'] == []
     for lang in LANGUAGES:
         for slug in slugs.values():
             assert not (tmp_path / lang.prefix / slug / "index.html").exists()
@@ -1058,7 +1067,7 @@ def test_headlines_keep_demand_and_spot_separate_and_audit_raw_precision(tmp_pat
         store.upsert(values)
         result = build_site(store, tmp_path, today=TODAY, built_at=STAMP)
         assert result["audit"]["status"] == "passed"
-        assert audit_site(store.connection, tmp_path)["html_pages"] == 72
+        assert audit_site(store.connection, tmp_path)["html_pages"] == 88
     text = (tmp_path / "h100-sxm-80gb/index.html").read_text(encoding="utf-8")
     page = Metadata(text)
     assert "$2.27" in page.meta['description'] and "cloud price per hour" in page.titles[0]
@@ -1655,7 +1664,7 @@ def test_lambda_effective_boundary_and_all_page_rows_across_eight_languages(tmp_
             assert all(c['attrs']['data-provider'] != 'lambda' for c in home.cards)
             # The standalone component prices remain display only, without downloads.
             assert 'DataDownload' not in text
-        exports = list((tmp_path/'data').glob('*.json'))
+        exports = [p for p in (tmp_path/'data').glob('*.json') if p.name != 'latest.json']
         assert len(exports) == 1
         data = json.loads(exports[0].read_text(encoding='utf-8'))
         assert {r['provider'] for r in data['offers']} == {'azure'}

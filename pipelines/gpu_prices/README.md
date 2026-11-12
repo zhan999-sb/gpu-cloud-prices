@@ -1,5 +1,64 @@
 # GPU price index — API and page-provider integration
 
+## b18 embeds, public data and daily observations
+
+`/embed/<model-slug>.html` is a self-contained, script-free, noindex widget below
+15,000 UTF-8 bytes. Locale variants use `/embed/<locale>/<model-slug>.html`, so
+the single generated `_headers` rule for `/embed/*` covers all eight languages
+without changing other routes. Its CSP permits framing and authorizes the one
+inline stylesheet by SHA-256, with no external resources or JavaScript. The
+attribution link uses `nofollow noopener`; it is not an affiliate link. Each
+model page has a readonly, keyboard-copyable iframe snippet and preview link.
+Widgets redistribute only current, eligible, export-allowed Tier A quotes;
+Spot, region, tax, availability, FX and community-marketplace qualifiers remain
+visible. Empty, stale or B/C-only models show an unavailable message.
+
+`/data/` and its seven localized equivalents document language-neutral Tier A
+exports, field semantics, refresh limits, observation/build timestamps and
+attribution. `/data/latest.json` lists the existing export URLs and their exact
+timestamps; it exists with an empty list when no models are exportable. CC BY
+4.0 applies only to our rights in compiled data and excludes provider content,
+trademarks and other third-party rights. Credit the index, link the data page
+and licence, retain sources/dates and identify changes.
+
+`/feed.xml` and each locale's `/feed.xml` contain at most 50 RSS items from the
+trailing 30 UTC days. Tier A eligible history supplies adjacent-day changes:
+an observed daily-minimum drop of at least 15%, or a new low in retained history
+for a reviewed popular family. Exact model variants and price types stay
+separate. A new provider means its first retained eligible observation after
+a prior-day baseline; initial imports are not announcements. Coverage changes
+can change minima. GUIDs, dates, ordering and content are deterministic for an
+identical observation snapshot; rebuild timestamps never create news.
+
+Homepage model cards show a price-drop badge only when today's selected minimum
+for the same price type is at least 10% below the median of the preceding seven
+daily minima. All seven preceding calendar days and today must be observed.
+This uses the existing displayed-history eligibility, including labelled B/C
+display-only quotes; those quotes never enter widgets, exports or feeds.
+
+`audience_audit.py` independently derives prices/events/badges from the SQL
+audit snapshot and checks all locale outputs, exact attribution/snippets,
+licence boundaries, export timestamps, header scope, CSS hash, script/resource
+absence, size, sitemap exclusion and manifest cleanup. It never imports the
+feature renderer. Offline regression and adversarial tests are in
+`tests/test_gpu_audience.py`. Browser QA helpers and retained reports are in
+`runtime/b18/`; they introduce no generator dependencies.
+
+```powershell
+python -B pipelines/gpu_prices/runtime/b18/run_checks.py tests3
+python -B pipelines/gpu_prices/runtime/b18/run_checks.py tests4
+python -B pipelines/gpu_prices/runtime/b18/run_checks.py build
+python -B pipelines/gpu_prices/runtime/b18/run_checks.py audit
+```
+
+The wrapper replays b17's database at `2026-11-12T22:16:41.760705Z` into
+`runtime/b18/preview/`, with `--site-base-url https://gpu-cloud-prices.pages.dev`.
+It never collects, pushes or deploys. Use new test phase names for reruns.
+Cloudflare header syntax: <https://developers.cloudflare.com/pages/configuration/headers/>.
+The framing directive requires HTTP headers, not a meta element:
+<https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/frame-ancestors>.
+Licence text: <https://creativecommons.org/licenses/by/4.0/>.
+
 Python 3.12 standard library only; pytest is the test runner. All commands below run from the repository root. Collection and builds do not read credentials, change network settings, or deploy.
 
 ```powershell

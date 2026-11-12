@@ -98,6 +98,7 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
     routes['/']=('home',None,facts['summary']['offers'],last)
     routes['/methodology']=('method',None,facts['summary']['offers'],last)
     routes['/404.html']=('404',None,0,last)
+    routes['/data/']=('data',None,3 if facts['exports'] else 0,max((d['last_updated'] for d in facts['exports'].values()),default=last))
     for model,d in facts['models'].items():
         route='/'+slugs[model]+'/'
         routes[route]=('model',model,d['statistics']['offers'],d['last_updated'] or last)
@@ -123,7 +124,7 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
         allowed=_allowed_literals(tr,facts)|set(SPECS)
         allowed.update(tr.text('compare_label',left=a,right=b) for a,b in PAIRS.values())
         for route,(kind,subject,count,modified) in routes.items():
-            filename=_file(route,lang);is_aux=kind in {'provider','comparison','continuation'}
+            filename=_file(route,lang);is_aux=kind in {'provider','comparison','continuation','data'}
             if is_aux:extra.add(filename);extra_html+=1
             try:
                 if parsed_main and filename in parsed_main:raw,page=parsed_main[filename]
@@ -213,6 +214,8 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
             elif kind=='continuation':
                 model,number=subject;title=tr.text('offer_page',model=model,number=number+1);description=tr.text('offer_pages_note')
                 expected_cards=_order([e for e in entries if e[1]['gpu_model']==model])[number*12:(number+1)*12]
+            elif kind=='data':
+                title=tr.text('growth_data_title');description=tr.text('growth_data_intro');expected_cards=[]
             if page.search_values!=expected_search:errors.append(filename+': search copy/counts differ from SQL')
             if title:
                 if page.h1!=[title]:errors.append(filename+': H1 differs from SQL metadata')
@@ -223,12 +226,17 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
             crumbs=[d for d in page.structured if d.get('@type')=='BreadcrumbList']
             if crumbs!=[expected_crumb] or page.breadcrumbs!=[' / '.join(label for label,_ in crumb_items)]:errors.append(filename+': breadcrumb mismatch')
             if is_aux:
+                if kind!='data' and any('data-growth' in a for _,a,_ in page.growth_nodes):errors.append(filename+': unexpected growth marker on auxiliary page')
                 if page.title!=tr.text('page_title',title=title,site_name=tr.text('site_name')):errors.append(filename+': auxiliary title mismatch')
                 for k,v in {'og:title':title,'twitter:title':title,'description':description,'og:description':description,'twitter:description':description}.items():
                     if page.metadata.get(k)!=v:errors.append(filename+': auxiliary '+k+' mismatch')
                 if any(d.get('@type') in {'Dataset','FAQPage'} for d in page.structured):errors.append(filename+': unexpected dataset/FAQ on auxiliary page')
                 _audit_cards(page,'auxiliary',tr,facts,filename,errors,entries_override=expected_cards)
                 permitted=allowed|{title}
+                if kind=='data':
+                    permitted.add('CC BY 4.0')
+                    permitted.update(origin+'/data/'+slugs[m]+'.json' for m in facts['exports'])
+                    permitted.update('· '+d['last_updated'] for d in facts['exports'].values())
                 for m in facts['models']:
                     permitted.update(tr.text('offer_page',model=m,number=i+1) for i in range((len(facts['models'][m]['offers'])+11)//12))
                 for text in set(page.unmarked):
