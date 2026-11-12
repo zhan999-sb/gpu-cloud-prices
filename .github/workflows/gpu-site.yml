@@ -74,7 +74,7 @@ jobs:
       - name: Run offline pipeline tests
         run: |
           mkdir -p ci/runtime
-          python -m pytest tests/test_gpu_*.py -q -p no:cacheprovider --basetemp ci/runtime/pipeline-tests --junitxml ci/reports/pipeline-tests.xml
+          python -m pytest ci/tests tests/test_gpu_*.py -q -p no:cacheprovider --basetemp ci/runtime/pipeline-tests --junitxml ci/reports/pipeline-tests.xml
           python -m unittest discover -s ci/tests -v 2>&1 | tee ci/reports/ci-tests.log
 
       - name: Collect prices and apply provider failure policy

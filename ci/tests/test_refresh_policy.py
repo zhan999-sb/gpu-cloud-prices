@@ -9,6 +9,7 @@ from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from ci.refresh_policy import (decide, fingerprint, main, prepare_save,
                                record_deployed, restore_receipt)
@@ -105,17 +106,71 @@ class RefreshTests(unittest.TestCase):
 
     def test_current_snapshot_removes_missing_keys_and_failed_providers(self):
         self.store.upsert([offer(sku='gone')])
-        before = fingerprint(self.store, now=NOW)
-        with self.store.connection:
-            self.store.connection.execute("INSERT INTO collection_runs VALUES (1,'azure',?,?,?,?,?,?)",
-                                          ('2026-11-12T07:59:00Z','2026-11-12T08:01:00Z','complete',1,1,''))
-            self.store.connection.execute("UPDATE offers SET collected_at='2026-11-12T07:00:00Z' WHERE sku='gone'")
-        self.assertNotEqual(before, fingerprint(self.store, now=NOW))
-        self.assertEqual(self.store.connection.execute('SELECT count(*) FROM offers').fetchone()[0], 2)
-        active = fingerprint(self.store, now=NOW)
-        with self.store.connection:
-            self.store.connection.execute("UPDATE collection_runs SET status='failed'")
-        self.assertNotEqual(active, fingerprint(self.store, now=NOW))
+        with patch('pipelines.gpu_prices.store.utc_now', return_value=NOW.isoformat()) as clock:
+            self.store.record_run(provider='azure', started_at=(NOW - timedelta(minutes=1)).isoformat(),
+                                  status='complete', pages=1, records=2)
+            before = fingerprint(self.store, now=NOW)  # Warm the observation cache.
+            self.assertEqual({o.sku for o in self.store.current_prices(NOW.date().isoformat(), NOW.isoformat())},
+                             {'test-h100', 'gone'})
+
+            later = NOW + timedelta(minutes=15)
+            # Replay the collector's public API sequence. Raw SQL offer edits
+            # bypass the cache invalidation performed by upsert().
+            self.store.upsert([offer(collected_at=later.isoformat())])
+            clock.return_value = later.isoformat()
+            self.store.record_run(provider='azure', started_at=(later - timedelta(minutes=1)).isoformat(),
+                                  status='complete', pages=1, records=1)
+            active = fingerprint(self.store, now=later)
+            self.assertNotEqual(before, active)
+            self.assertEqual([o.sku for o in self.store.current_prices(later.date().isoformat(), later.isoformat())],
+                             ['test-h100'])
+            self.assertEqual(self.store.connection.execute('SELECT count(*) FROM offers').fetchone()[0], 2)
+            with PriceStore(self.db, read_only=True) as restored:
+                self.assertEqual(active, fingerprint(restored, now=later))
+
+            failed_at = later + timedelta(minutes=15)
+            clock.return_value = failed_at.isoformat()
+            self.store.record_run(provider='azure', started_at=(failed_at - timedelta(minutes=1)).isoformat(),
+                                  status='failed', pages=0, records=0)
+            self.assertNotEqual(active, fingerprint(self.store, now=failed_at))
+            self.assertEqual(self.store.current_prices(failed_at.date().isoformat(), failed_at.isoformat()), [])
+            self.assertEqual([r[0] for r in self.store.connection.execute('SELECT status FROM collection_runs ORDER BY id')],
+                             ['complete', 'failed'])
+
+    def test_visible_population_changes_require_save_and_build(self):
+        # Unchanged prices must still refresh when a complete run loses one or
+        # all offers, or a failure hides a provider. Other providers stay visible.
+        cases = [('missing_offer', 'complete', [offer()]),
+                 ('empty_complete_run', 'complete', []),
+                 ('failed_provider', 'failed', [])]
+        unrelated = offer(provider='linode', sku='unrelated')
+        for name, status, remaining in cases:
+            with self.subTest(case=name), PriceStore(':memory:') as store, PriceStore(':memory:') as expected:
+                store.upsert([offer(), offer(sku='gone'), unrelated])
+                with patch('pipelines.gpu_prices.store.utc_now', return_value=NOW.isoformat()) as clock:
+                    for provider, records in [('azure', 2), ('linode', 1)]:
+                        store.record_run(provider=provider, started_at=(NOW - timedelta(minutes=1)).isoformat(),
+                                         status='complete', pages=1, records=records)
+                    prepare_save(store, now=NOW)
+                    before = fingerprint(store, now=NOW)
+                    record_deployed(store, self.receipt, before, now=NOW)
+                    self.assertFalse(decide(store, now=NOW)['build'])
+                    self.assertFalse(decide(store, now=NOW)['save'])
+
+                    later = NOW + timedelta(minutes=15)
+                    store.upsert([replace(row, collected_at=later.isoformat()) for row in remaining])
+                    clock.return_value = later.isoformat()
+                    store.record_run(provider='azure', started_at=(later - timedelta(minutes=1)).isoformat(),
+                                     status=status, pages=1 if status == 'complete' else 0, records=len(remaining))
+
+                expected.upsert(remaining + [unrelated])
+                result = decide(store, now=later)
+                self.assertEqual({(o.provider, o.sku) for o in store.current_prices(later.date().isoformat(), later.isoformat())},
+                                 {(o.provider, o.sku) for o in remaining + [unrelated]})
+                self.assertEqual(result['fingerprint'], fingerprint(expected, now=later))
+                self.assertNotEqual(before, result['fingerprint'])
+                self.assertTrue(result['changed'] and result['save'] and result['build'])
+                self.assertFalse(result['new_utc_day'])
 
     def test_price_change_or_failed_deploy_is_never_suppressed(self):
         self.saved_and_deployed()
@@ -219,6 +274,7 @@ class WorkflowTests(unittest.TestCase):
             workflow = (root / '.github/workflows' / filename).read_text(encoding='utf-8')
             step = workflow[:workflow.index('--basetemp ci/runtime/pipeline-tests')]
             self.assertIn('mkdir -p ci/runtime\n', step)
+            self.assertIn('python -m pytest ci/tests tests/test_gpu_*.py ', step)
         production = (root / '.github/workflows/gpu-site.yml').read_text(encoding='utf-8')
         self.assertIn("cron: '*/15 * * * *'", production)
         self.assertEqual(production.count("if: success() && steps.refresh.outputs.build == 'true'"), 2)

@@ -37,5 +37,5 @@ jobs:
         run: |
           mkdir -p ci/runtime
           for script in ci/*.sh; do bash -n "$script"; done
-          python -m pytest tests/test_gpu_*.py -q -p no:cacheprovider --basetemp ci/runtime/pipeline-tests
+          python -m pytest ci/tests tests/test_gpu_*.py -q -p no:cacheprovider --basetemp ci/runtime/pipeline-tests
           python -m unittest discover -s ci/tests -v
