@@ -344,7 +344,7 @@ def test_site_from_fixtures_cheapest_html_json_and_history(tmp_path):
                       offer(collected_at="2026-11-11T08:00:00Z", price_per_hour=40, price_per_gpu_hour=5)])
         store.record_run(provider="azure", started_at=STAMP, status="limited", pages=3, records=3)
         result = build_site(store, tmp_path, today=TODAY, built_at=STAMP)
-    assert result["offers_today"] == 2 and result["html_pages"] == 4 * len(LANGUAGES)
+    assert result["offers_today"] == 2 and result["html_pages"] == 9 * len(LANGUAGES)
     index = (tmp_path / "index.html").read_text(encoding="utf-8")
     assert '/statistics/cheapest/on_demand" data-format="money">$3.00</span>' in index
     assert '/statistics/cheapest/spot" data-format="money">$1.00</span>' in index
@@ -611,13 +611,13 @@ def test_seo_sharing_structured_data_and_sitemap(tmp_path):
     model = Metadata((tmp_path / "h100-sxm-80gb" / "index.html").read_text(encoding="utf-8"))
     assert index.json_ld[0]["@type"] == "WebSite" and index.json_ld[0]["url"] == origin + "/"
     assert model.canonicals == [origin + "/h100-sxm-80gb/"]
-    assert "on-demand $3.00/GPU-hr, Spot $1.00/GPU-hr - 3 offers across 2 regions (updated 2026-11-12)" in model.titles[0]
-    assert "3 offers across 2 regions" in model.meta["description"]
+    assert "H100 SXM 80GB cloud price per hour (updated 2026-11-12)" in model.titles[0]
+    assert "minimum $1.00, median $3.00. Eligible offers: 3; providers: 1" in model.meta["description"]
     for page in (index, model):
         assert page.meta["og:url"] == page.canonicals[0]
         assert page.meta["og:type"] == "website"
         assert page.meta["og:title"] and page.meta["twitter:title"]
-        assert page.meta["twitter:card"] == "summary"
+        assert page.meta["twitter:card"] == ("summary_large_image" if page is model else "summary")
         assert page.meta["og:description"] == page.meta["twitter:description"] == page.meta["description"]
         assert "robots" not in page.meta
     dataset = model.json_ld[0]
@@ -630,9 +630,9 @@ def test_seo_sharing_structured_data_and_sitemap(tmp_path):
     sitemap = ET.fromstring((tmp_path / "sitemap.xml").read_text(encoding="utf-8"))
     urls = {entry.find("s:loc", namespace).text: entry.find("s:lastmod", namespace).text for entry in sitemap}
     assert urls == {origin + lang.path(route): TODAY for lang in LANGUAGES
-                    for route in ("/", "/methodology", "/h100-sxm-80gb/")}
+                    for route in ("/", "/methodology", "/h100-sxm-80gb/", "/providers/azure/")}
     assert set(result["sitemap_urls"]) == set(urls)
-    assert (tmp_path / "robots.txt").read_text() == f"User-agent: *\nAllow: /\n\nSitemap: {origin}/sitemap.xml\n"
+    assert (tmp_path / "robots.txt").read_text() == f"User-agent: *\nAllow: /\n\nSitemap: {origin}/sitemap.xml\n"+''.join(f'Sitemap: {origin}/sitemap-{l.code}.xml\n' for l in LANGUAGES)
     assert "Page not found" in (tmp_path / "404.html").read_text(encoding="utf-8")
     assert not list(tmp_path.glob("h100*.html")) and not list(tmp_path.glob("h100*.json"))
 
@@ -653,7 +653,7 @@ def test_thin_content_noindex_and_sitemap_boundary(tmp_path, count):
     content = (tmp_path / "h100-sxm-80gb" / "index.html").read_text(encoding="utf-8")
     page = Metadata(content)
     if count == 0:
-        assert "0 offers across 0 regions" in page.titles[0]
+        assert "no current eligible offers" in page.titles[0]
         assert "temporalCoverage" not in page.json_ld[0]
         assert "Historical prices below are not current offers" in content
 
@@ -698,7 +698,8 @@ def test_complete_snapshot_excludes_earlier_same_day_keys_without_deleting_histo
     assert exported["history"]["on_demand"][0]["min"] == 3
     assert exported["history"]["on_demand"][0]["count"] == 2
     page = Metadata((tmp_path / "h100-sxm-80gb" / "index.html").read_text(encoding="utf-8"))
-    assert "on-demand $3.00/GPU-hr, Spot $1.00/GPU-hr - 3 offers across 3 regions" in page.titles[0]
+    assert "H100 SXM 80GB cloud price per hour" in page.titles[0]
+    assert "minimum $1.00, median $3.00. Eligible offers: 3" in page.meta['description']
     assert "old-region" not in {place["name"] for place in page.json_ld[0]["spatialCoverage"]}
 
 
@@ -713,7 +714,7 @@ def test_json_ld_escaping_and_manifest_cleanup(tmp_path):
         store.upsert([offer(gpu_model=name, region='region </script> & "quote"')])
         build_site(store, tmp_path, today=TODAY, built_at=STAMP)
     content = (tmp_path / model_slug(name) / "index.html").read_text(encoding="utf-8")
-    assert content.count('<script') == 3  # Inert Dataset/FAQ plus local filter module.
+    assert content.count('<script') == 4  # Inert Dataset/FAQ/breadcrumbs plus local filter module.
     assert Metadata(content).json_ld[0]["name"] == name + " observed GPU prices"
     assert not (tmp_path / "legacy-hash.html").exists() and preserved.read_text() == "keep"
 
@@ -802,6 +803,8 @@ def assert_multilingual_site(root, origin, models):
     """Audit every generated page, including noindex models and all 404s."""
     catalogs = load_catalogs()
     routes = {"/", "/methodology", "/404.html"} | {"/" + slug + "/" for slug in models.values()}
+    from pipelines.gpu_prices.search_specs import PAIRS
+    routes |= ({'/providers/azure/'} if models else set()) | {'/compare/'+slug+'/' for slug in PAIRS}
     all_pages = {origin + lang.path(route): (lang, route) for lang in LANGUAGES for route in routes}
     assert len(list(root.rglob("*.html"))) == len(all_pages)
     parsed, metadata, contact_bytes = {}, {}, set()
@@ -850,7 +853,7 @@ def assert_multilingual_site(root, origin, models):
             assert {other.path() for other in LANGUAGES} <= homes
         if route == "/methodology":
             assert catalogs[lang.code].html("method_history") in text
-        if route.endswith('/') and route != '/':
+        if route in {'/'+slug+'/' for slug in models.values()}:
             assert page.json_ld[0]["distribution"]["contentUrl"] == origin + "/data/" + route.strip('/') + ".json"
     assert len(contact_bytes) == 1
     for url, parser in parsed.items():
@@ -883,7 +886,7 @@ def assert_multilingual_site(root, origin, models):
         assert all(a.attrib["rel"] == "alternate" for a in alternates)
         assert {a.attrib["hreflang"]: a.attrib["href"] for a in alternates} == dict(metadata[url].alternates)
         assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", entry.find("s:lastmod", ns).text)
-    assert (root / "robots.txt").read_text(encoding="utf-8") == f"User-agent: *\nAllow: /\n\nSitemap: {origin}/sitemap.xml\n"
+    assert (root / "robots.txt").read_text(encoding="utf-8") == f"User-agent: *\nAllow: /\n\nSitemap: {origin}/sitemap.xml\n"+''.join(f'Sitemap: {origin}/sitemap-{l.code}.xml\n' for l in LANGUAGES)
 
 
 @pytest.mark.parametrize("origin", ["https://one.example.test", "https://two.example.test:443"])
@@ -900,7 +903,7 @@ def test_every_language_page_reciprocal_metadata_links_sitemap_and_contact(tmp_p
         store.record_run(provider="azure", started_at=STAMP, status="limited", pages=3, records=6)
         result = build_site(store, tmp_path, today=TODAY, built_at=STAMP)
     assert_multilingual_site(tmp_path, origin, model_slugs(names))
-    assert result["html_pages_by_language"] == {lang.code: 7 for lang in LANGUAGES}
+    assert result["html_pages_by_language"] == {lang.code: 12 for lang in LANGUAGES}
     assert len(list((tmp_path / "data").glob("*.json"))) == len(names)
     catalogs = load_catalogs()
     for lang in LANGUAGES:
@@ -909,15 +912,14 @@ def test_every_language_page_reciprocal_metadata_links_sitemap_and_contact(tmp_p
         content = (tmp_path / lang.prefix / "a100-80gb/index.html").read_text(encoding="utf-8")
         assert '$1.23' in content and '$1,23' not in content
         page = Metadata(content)
-        assert "1.23" in page.titles[0] and TODAY in page.titles[0]
+        assert "1.23" in page.meta['description'] and TODAY in page.titles[0]
         singular = {
             "en": "1 offer across 1 Azure region", "zh-Hans": "1 条报价、1 个 Azure 区域",
             "ja": "1 件、Azure 1 リージョン", "ko": "요금 1건, Azure 지역 1곳",
             "de": "1 Angebot in 1 Azure-Region", "fr": "1 offre dans 1 région Azure",
             "es": "1 oferta en 1 región de Azure", "pt-BR": "1 oferta em 1 região do Azure",
         }
-        assert catalogs[lang.code].quantity("offer_count", 1) in page.titles[0]
-        assert catalogs[lang.code].quantity("azure_region_count", 1) in page.titles[0]
+        assert page.meta['og:title'] == catalogs[lang.code].text('search_title',model='A100 80GB',date=TODAY)
         homepage = Metadata((tmp_path / lang.prefix / "index.html").read_text(encoding="utf-8"))
         assert "5" in homepage.titles[0] and "5" in homepage.meta["description"]
         assert "3" in homepage.titles[0] and "3" in homepage.meta["description"]
@@ -1056,11 +1058,11 @@ def test_headlines_keep_demand_and_spot_separate_and_audit_raw_precision(tmp_pat
         store.upsert(values)
         result = build_site(store, tmp_path, today=TODAY, built_at=STAMP)
         assert result["audit"]["status"] == "passed"
-        assert audit_site(store.connection, tmp_path)["html_pages"] == 32
+        assert audit_site(store.connection, tmp_path)["html_pages"] == 72
     text = (tmp_path / "h100-sxm-80gb/index.html").read_text(encoding="utf-8")
     page = Metadata(text)
-    assert "on-demand $12.29/GPU-hr, Spot $2.27/GPU-hr" in page.titles[0]
-    assert "on-demand $12.29/GPU-hr" in page.meta["description"]
+    assert "$2.27" in page.meta['description'] and "cloud price per hour" in page.titles[0]
+    assert "median $7.28" in page.meta["description"] and "on-demand: 1; Spot: 1" in page.meta['description']
     assert "Edge zone" in text and "Restricted region" in text
     assert "FAQPage" in text and "theme-color" in text and "og:image" in text
     assert page.json_ld[1]["mainEntity"][0]["acceptedAnswer"]["text"].startswith("On-demand: $12.29/GPU-hour. Spot: $2.27")
@@ -1102,7 +1104,7 @@ def test_fractional_prices_are_separate_and_medians_are_across_offers(tmp_path):
     assert "Fractional GPU, 1/3 share; price normalized to a full-GPU equivalent" in text
     assert "$0.020" in text and "$0.060" in text and "$1.23" in text
     assert 'data-format="text">3</span>)' in text
-    assert "on-demand $1.23/GPU-hr" in Metadata(text).titles[0]
+    assert "minimum $1.23" in Metadata(text).meta['description']
 
 
 @pytest.mark.parametrize("spot", [84.80, 90.00])
@@ -1136,7 +1138,7 @@ def test_independent_audit_rejects_corrupt_published_numbers(tmp_path, damage):
             elif damage == "title":
                 text = text.replace("<title>H100", "<title>H200", 1)
             elif damage == "metadata":
-                text = text.replace('content="H100 SXM 80GB across providers: on-demand $3.00', 'content="H100 SXM 80GB across providers: on-demand $8.00', 1)
+                text = text.replace('content="H100 SXM 80GB cloud price per hour', 'content="H200 SXM 80GB cloud price per hour', 1)
             elif damage == "faq":
                 text = text.replace('data-faq="0">On-demand: $3.00', 'data-faq="0">On-demand: $0.30', 1)
             elif damage == "bar":
@@ -1441,7 +1443,9 @@ def test_home_offer_cap_and_model_page_keeps_all_observations(tmp_path):
         build_site(store,tmp_path,today=TODAY,built_at=STAMP)
     home=Page((tmp_path/'index.html').read_text(encoding='utf-8'))
     model=Page((tmp_path/'h100-sxm-80gb/index.html').read_text(encoding='utf-8'))
-    assert len(home.cards)==101 and len(model.cards)==105
+    all_model_cards=[c for path in (tmp_path/'h100-sxm-80gb').rglob('*.html') for c in Page(path.read_text(encoding='utf-8')).cards]
+    assert len(home.cards)==101 and len(model.cards)==12 and len(all_model_cards)==105
+    assert len({c['attrs']['data-offer'] for c in all_model_cards})==105
     rates=[float(c['attrs']['data-sort-gpu']) for c in home.cards if c['attrs']['data-list']=='offers']
     assert rates==sorted(rates) and rates[0]==.01 and rates[-1]==1
     assert 'See all for H100 SXM 80GB' in home.text and 'up to 100 offers' in home.text

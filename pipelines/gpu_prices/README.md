@@ -166,3 +166,68 @@ all stored provider populations, including stale/failed providers. Both include
 actual SQLite pages/index overhead and deterministic daily price drift. Current
 listings and health records are bounded and do not multiply by scheduled runs.
 The estimate assumes comparable provider/group cardinality in the next month.
+
+## b16 search landing pages and technical SEO
+
+Existing `/<model-slug>/` routes remain the search targets in all eight locales.
+Their title/H1 uses the eligible observation date, not today's build clock.
+Build-time introductions give the unweighted eligible USD minimum/median,
+offer/provider counts and on-demand/Spot counts. The fourth visible FAQ describes
+the observed daily-minimum change inside a trailing 30-day window, with actual
+endpoints and coverage warnings; fewer than two observed days produces an
+explicit unavailable answer. No missing days or prices are estimated. A replay
+does not include future-dated observations or history after its observation day.
+
+The landing page shows the first 12 price-ordered records. Complete current
+lists continue at `/<model-slug>/offers/2/`, etc., with original values, labels,
+source links and static HTML. Every continuation is noindex and linked from its
+model page; its filters apply to that page's records. Both landing pages and
+continuations have a hard 300,000-byte UTF-8 HTML build/audit limit. The audit
+reconstructs the complete partition from SQLite and rejects missing, duplicated
+or mislabelled cards. This supersedes the b15 single-document model list.
+
+Tracked providers have `/providers/<provider>/` pages (`clore-ai` for Clore.ai),
+including coverage/tier/source notes, current and eligible counts per model,
+cheapest eligible quotes, original offer cards and reviewed outbound links.
+Only these comparison routes are generated: `/compare/h100-vs-a100/`,
+`/compare/a100-vs-l40s/`, `/compare/rtx-4090-vs-rtx-5090/`,
+`/compare/h100-vs-h200/`. Prices retain exact configuration rows. Reference
+hardware specifications are curated in `search_specs.py`, with official URLs
+shown on each comparison. Sparse Tensor Core peaks and GeForce FP32 accumulation
+are explicit; the H200 preliminary-specification qualifier is retained. There
+are no workload benchmarks or subjective performance/rental recommendations.
+
+Indexing requires at least three **current eligible** offers, not merely three
+display records. Comparisons additionally require three per side. Home and
+methodology use the site's eligible population; localized 404s and all offer
+continuations are always noindex. Every noindex page is excluded from the root
+and per-language sitemaps. `robots.txt` advertises all nine sitemaps. Every HTML
+route has self-canonical URLs, eight reciprocal hreflang alternatives plus
+x-default, visible breadcrumbs with BreadcrumbList JSON-LD, and social metadata.
+Each model gets a 1200x630 PNG, shared across locale equivalents with localized
+meta text/alt text. The PNG writer uses an original bitmap font, struct and zlib:
+no Pillow, converter, font installation or new CI dependency is needed.
+
+FAQPage data must match the visible questions and answers. Dataset markup only
+describes A/export-allowed JSON data, including A-only source/region/summary and
+actual currency units; B/C-only pages emit WebPage instead. Source/price/tax,
+community-marketplace and stablecoin/platform-fee disclosures remain visible.
+`search_audit.py` uses the main audit's independent SQL snapshot, rather than
+renderer statistics. It checks search copy, tables/labels, official references,
+all links/canonicals/hreflang, exact sitemap membership and lastmod, pagination,
+and PNG content/CRCs/dimensions; it also checks thin pages that are noindex.
+
+Local reproducible b16 checks (fresh names for test temp directories):
+
+```powershell
+python -B pipelines/gpu_prices/runtime/b16/run_checks.py tests1
+python -B pipelines/gpu_prices/runtime/b16/run_checks.py tests2
+python -B pipelines/gpu_prices/runtime/b16/run_checks.py build
+python -B pipelines/gpu_prices/runtime/b16/run_checks.py audit
+```
+
+The build wrapper uses `--site-base-url https://gpu-cloud-prices.pages.dev` and
+replays `--as-of 2026-11-12T17:43:29.976595Z` from the read-only database. This is
+an existing observation snapshot, not a new collection. Logs, final source/data
+hashes, size/count evidence and the delivery report stay in `runtime/b16/`.
+No push or deployment is part of these checks.

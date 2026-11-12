@@ -128,7 +128,7 @@ def _snapshot(connection, day, generated):
     stamp = lambda value: datetime.fromisoformat(value.replace('Z','+00:00'))
     current = []
     for row in rows:
-        if row['day'] != day or not _current(row, generated):
+        if row['day'] != day or stamp(row['collected_at'])>stamp(generated) or not _current(row, generated):
             continue
         last = providers.get(row['provider'])
         if last and (last['status']=='failed' or last['started_at'][:10] != day):
@@ -147,22 +147,23 @@ def _snapshot(connection, day, generated):
         for kind in ('on_demand','spot'):
             grouped = {}
             for row in rows:
-                if row['gpu_model'] == name and row['day'] != day and row['price_type']==kind and _eligible(row) and _current(row,row['day']+'T23:59:59.999999Z') and (not export_only or row['tier']=='A' and row['export_allowed']):
+                if row['gpu_model'] == name and row['day'] < day and row['price_type']==kind and _eligible(row) and _current(row,row['day']+'T23:59:59.999999Z') and (not export_only or row['tier']=='A' and row['export_allowed']):
                     grouped.setdefault(row['day'],[]).append(row)
             good = [r for r in active if _eligible(r) and r['price_type']==kind]
             if good:
                 grouped[day] = good
             result[kind] = [{'day':d,'currency':'USD','price_type':kind,**_distribution(grouped[d])} for d in sorted(grouped)]
         return result
-    for name in sorted({r['gpu_model'] for r in rows}):
+    observed_rows=[r for r in rows if stamp(r['collected_at'])<=stamp(generated)]
+    for name in sorted({r['gpu_model'] for r in observed_rows}):
         offers = [r for r in current if r['gpu_model']==name]
-        updated = max((r['collected_at'] for r in offers),default=max(r['collected_at'] for r in rows if r['gpu_model']==name))
+        updated = max((r['collected_at'] for r in offers),default=max(r['collected_at'] for r in observed_rows if r['gpu_model']==name))
         data = {'gpu_model':name,'currency':next(iter({r['currency'] for r in offers})) if len({r['currency'] for r in offers})==1 else 'USD' if not offers else 'MULTI','observation_day':day,'last_updated':updated,
                 'generated_at':generated,'source':sorted({PROVIDERS[r['provider']]['source'] for r in offers if r['provider'] in PROVIDERS}) or [SOURCE],'latest_collection':run,
                 'offers':[exported(r) for r in offers],'statistics':_statistics(offers),'history':history(name,offers,False)}
         models[name] = data
         permitted = [r for r in offers if r['tier']=='A' and r['export_allowed']]
-        history_rows = [r for r in rows if r['gpu_model']==name and r['tier']=='A' and r['export_allowed']]
+        history_rows = [r for r in rows if r['gpu_model']==name and r['tier']=='A' and r['export_allowed'] and stamp(r['collected_at'])<=stamp(generated)]
         if history_rows:
             exports[name] = {**data,'last_updated':max(r['collected_at'] for r in history_rows),
                 'currency':next(iter({r['currency'] for r in permitted})) if len({r['currency'] for r in permitted})==1 else 'USD' if not permitted else 'MULTI',
@@ -180,7 +181,7 @@ def _snapshot(connection, day, generated):
     return {'models':models,'exports':exports,'coverage':coverage,'date':day,'built':generated,'run':run,
             'summary':{'models':len({r['gpu_model'] for r in good}),'offers':len(good),'regions':len({r['region'] for r in good}),
                        'providers':len({r['provider'] for r in good}), 'updated':max((r['collected_at'] for r in good), default=None)},
-            'all_rows':rows,'last_updated':max((r['collected_at'] for r in rows),default=None),
+            'all_rows':rows,'last_updated':max((r['collected_at'] for r in observed_rows),default=None),
             'current_updated':max((r['collected_at'] for r in current),default=None)}
 
 
@@ -223,11 +224,16 @@ class Page(HTMLParser):
         self.faqs, self.title, self.text, self.unmarked = {}, "", "", []
         self.cards, self.card = [], None
         self.groups, self.offer_groups, self.summary_quotes, self.summary_strips = [], [], [], []
+        self.links, self.h1, self.search_values, self.breadcrumbs, self.outside_values = [], [], {}, [], []
+        self.faq_questions=[]
+        self.table_rows,self.current_row=[],None
         self.feed(text)
         self.close()
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
+        if tag=='tr':self.current_row=[]
+        if tag in {'a','link','script'}:self.links.append((tag,a))
         if 'data-model-group' in a:self.groups.append((tag,a))
         if 'data-offer-category' in a:self.offer_groups.append((tag,a))
         if 'data-offer' in a:
@@ -253,7 +259,7 @@ class Page(HTMLParser):
             frame[2].append(data)
         if not any(f[0] in ("script", "style", "head") for f in self.stack):
             self.text += data
-            if re.search(r"[0-9$%]", data) and not any("data-stat" in f[1] or "data-faq" in f[1] or f[0] == "time" for f in self.stack):
+            if re.search(r"[0-9$%]", data) and not any("data-stat" in f[1] or "data-faq" in f[1] or "data-search" in f[1] or f[0] == "time" for f in self.stack):
                 self.unmarked.append(data.strip())
 
     def handle_endtag(self, tag):
@@ -261,10 +267,23 @@ class Page(HTMLParser):
             return
         kind, a, chunks = self.stack.pop()
         text = ''.join(chunks)
+        if kind=='td' and self.current_row is not None:self.current_row.append(text)
+        if kind=='tr':
+            if self.current_row:self.table_rows.append(self.current_row)
+            self.current_row=None
+        if kind=='h1':self.h1.append(text)
+        if kind=='summary' and any(f[1].get('class')=='faq' for f in self.stack):self.faq_questions.append(text)
+        if ('data-search' in a or 'data-faq' in a) and any('hidden' in attrs or 'display:none' in attrs.get('style','').replace(' ','') for attrs in [a]+[f[1] for f in self.stack]):raise AuditError('Search/FAQ answers must be visible')
+        if 'data-search' in a:
+            key=a['data-search']
+            if key in self.search_values:raise AuditError('Duplicate search content marker: '+key)
+            self.search_values[key]=text
+        if kind=='nav' and a.get('class')=='breadcrumbs':self.breadcrumbs.append(text)
         if 'data-summary-offer' in a:self.summary_quotes.append((a['data-summary-offer'],text))
         if a.get('class')=='summary-strip':self.summary_strips.append(text)
         if "data-stat" in a:
             self.values.append((a["data-stat"], a.get("data-format"), text))
+            if self.card is None:self.outside_values.append(self.values[-1])
             if self.card is not None:
                 self.card['values'].append((a['data-stat'],a.get('data-format'),text))
         if self.card is not None:
@@ -296,17 +315,9 @@ def _metadata(tr, model, data, facts):
         return tr.text("method_title"), tr.text("method_description", **numbers)
     if model == "/404.html":
         return tr.text("not_found"), tr.text("not_found_description")
-    stats = data["statistics"]
-    if data["offers"]:
-        title = tr.text("model_title", model=model,
-                        price=_dollars(stats["cheapest"]["on_demand"]) if stats["cheapest"]["on_demand"] is not None else tr.text("not_observed"),
-                        spot_price=_dollars(stats["cheapest"]["spot"]) if stats["cheapest"]["spot"] is not None else tr.text("not_observed"),
-                        count=tr.quantity("offer_count", stats["offers"]), regions=tr.quantity("azure_region_count", stats["region_count"]), date=data["last_updated"][:10])
-    else:
-        title = tr.text("model_empty_title", model=model, count=tr.quantity("offer_count", 0), regions=tr.quantity("azure_region_count", 0), date=day)
-        if data["last_updated"]:
-            title = tr.text("last_observed", title=title, date=data["last_updated"][:10])
-    return title, tr.text("model_description", title=title)
+    from .search_audit import model_copy
+    title,intro,_=model_copy(model,data,tr)
+    return title,title+'. '+intro
 
 
 def _faq_expected(tr, name, data, day):
@@ -316,7 +327,8 @@ def _faq_expected(tr, name, data, day):
     comparison = tr.text("no_discount") if stats["spot_no_discount"] else tr.text("discount_below", percent=format(percent, ".2f")) if percent is not None else tr.text("not_observed")
     questions = [tr.text("faq_cheapest_q", model=name), tr.text("faq_spot_q"), tr.text("faq_units_q")]
     answers = [tr.text("faq_cheapest_a", demand=_dollars(demand) if demand is not None else tr.text("not_observed"), spot=_dollars(spot) if spot is not None else tr.text("not_observed"), regions=stats["region_count"], offers=stats["offers"], date=day), tr.text("faq_spot_a", comparison=comparison), tr.text("faq_units_a")]
-    return questions, answers
+    from .search_audit import model_copy
+    return questions+[tr.text('search_trend_q')], answers+[model_copy(name,data,tr)[2]]
 
 
 def _allowed_literals(tr, facts):
@@ -337,6 +349,8 @@ def _allowed_literals(tr, facts):
         allowed.add(tr.text("chart_title", kind=tr.text(kind)))
         allowed.add(tr.text("history_caption", kind=tr.text(kind)))
     for model in facts["models"]:
+        from .search_audit import model_copy
+        allowed.add(model_copy(model,facts['models'][model],tr)[0])
         allowed.update((model, tr.text("faq_heading", model=model), tr.text("faq_cheapest_q", model=model), model + " / " + tr.text("on_demand_from")))
         allowed.add(tr.text('see_model',model=model))
         stats = facts["models"][model]["statistics"]
@@ -388,7 +402,7 @@ def _audit_summary(page, entries, tr, facts, filename, errors):
         errors.append(filename+': missing summary numeric audit marker')
 
 
-def _audit_cards(page, name, tr, facts, filename, errors):
+def _audit_cards(page, name, tr, facts, filename, errors, entries_override=None):
     """Independently reconstruct card selection, scopes, labels and default order.
 
     The renderer is not an oracle: these identities and amounts come from SQL.
@@ -401,6 +415,8 @@ def _audit_cards(page, name, tr, facts, filename, errors):
         entries.extend((stem+str(i),row) for i,row in enumerate(data['offers']))
     fractional=lambda r:_allocation(r)=='fractional'
     order=lambda item:(item[1]['currency']!='USD' or item[1]['price_scope']=='gpu_component' or _rate(item[1]) is None,item[1]['currency'],_rate(item[1]) if _rate(item[1]) is not None else item[1]['price_per_hour'],item[0])
+    if entries_override is not None:entries=entries_override
+    elif name in facts['models']:entries=sorted(entries,key=order)[:12]
     expected=[]
     if name is None:
         minima=[]
@@ -458,6 +474,8 @@ def _audit_cards(page, name, tr, facts, filename, errors):
         if url.get('href')!=link['url'] or url.get('target')!='_blank' or url.get('rel')!=('sponsored nofollow noopener' if link['is_affiliate'] else 'nofollow noopener'):
             errors.append(filename+': offer card destination/relationship mismatch')
         pointer=a['data-offer']
+        provider_route=tr.language.path('/providers/'+('clore-ai' if row['provider']=='clore' else row['provider'].replace('_','-'))+'/')
+        if not any(link.get('href')==provider_route for link in card['links']):errors.append(filename+': missing card provider profile link')
         count=str(int(row['gpu_count'])) if row['gpu_count'] in (1,2,4) and not fractional(row) else '8+' if row['gpu_count'] is not None and row['gpu_count']>=8 and not fractional(row) else 'other'
         for attr,value in {'data-gpu-model':row['gpu_model'],'data-gpu-count':count,'data-provider':row['provider'],'data-price-type':row['price_type'],'data-region-class':_classification(row['region'])}.items():
             if a.get(attr)!=value:errors.append(filename+': offer card '+attr+' mismatch')
@@ -526,7 +544,7 @@ def audit_site(connection_or_path, out):
 def _audit(conn, out):
     manifest = json.loads((out / "gpu-prices-manifest.json").read_text(encoding="utf-8"))
     facts = _snapshot(conn, manifest["observation_day"], manifest["generated_at"])
-    errors, checked, html_pages = [], 0, 0
+    errors, checked, html_pages, parsed_main = [], 0, 0, {}
     # Independently verify the new semantic/provenance contract in SQLite.
     for row in facts['all_rows']:
         key = row['provider'] + '/' + row['sku']
@@ -574,6 +592,7 @@ def _audit(conn, out):
         checked += 1
     for lang in LANGUAGES:
         tr = catalogs[lang.code]
+        language_literals = _allowed_literals(tr, facts)
         routes = [(None, "index.html"), ("/methodology", "methodology.html"), ("/404.html", "404.html")]
         routes += [(name, slugs[name] + "/index.html") for name in facts["models"]]
         for name, relative in routes:
@@ -581,6 +600,7 @@ def _audit(conn, out):
             expected_files.add(filename)
             raw = (out / filename).read_text(encoding="utf-8")
             page = Page(raw)
+            parsed_main[filename]=(raw,page)
             data = facts["models"].get(name)
             page_facts = {**facts, "page_updated": data["last_updated"] if data else facts["last_updated"]}
             title, description = _metadata(tr, name, data, facts)
@@ -614,15 +634,21 @@ def _audit(conn, out):
                 except (KeyError, IndexError, TypeError, ValueError):
                     errors.append(filename + ": invalid statistic pointer " + pointer)
                 checked += 1
-            allowed = _allowed_literals(tr, facts)
+            allowed = set(language_literals)
+            if data:
+                allowed.update(tr.text('offer_page',model=name,number=i+1) for i in range((len(data['offers'])+11)//12))
+            from .search_specs import PAIRS
+            allowed.update(tr.text('compare_label',left=a,right=b) for a,b in PAIRS.values())
             for text in set(page.unmarked):
                 if text not in allowed:
                     errors.append(filename + ": unaccounted numeric text " + repr(text))
             present = {p for p, _, _ in page.values}
             _audit_cards(page, name, tr, facts, filename, errors)
             if data:
+                main_pointers={c['attrs']['data-offer'] for c in page.cards}
                 for i, row in enumerate(data["offers"]):
                     prefix = "/models/" + name.replace("~", "~0").replace("/", "~1") + "/offers/" + str(i) + "/"
+                    if prefix[:-1] not in main_pointers:continue
                     for field in ("price_per_hour", "price_per_gpu_hour", "gpu_count", "vcpu", "ram_gb"):
                         if row[field] is None:
                             continue
@@ -630,27 +656,33 @@ def _audit(conn, out):
                             errors.append(filename + ": missing offer value " + prefix + field)
                 if data["offers"]:
                     questions, answers = _faq_expected(tr, name, data, facts["date"])
-                    if page.faqs != dict(enumerate(answers)):
+                    if page.faqs != dict(enumerate(answers)) or page.faq_questions!=questions:
                         errors.append(filename + ": visible FAQ differs from independent statistics")
                     faq = next((d for d in page.structured if d.get("@type") == "FAQPage"), {})
                     entities = [{"@type": "Question", "name": q, "acceptedAnswer": {"@type": "Answer", "text": a}} for q, a in zip(questions, answers)]
                     _compare(faq.get("mainEntity"), entities, filename + "/FAQPage", errors)
-                if page.structured[0].get("description") != description:
-                    errors.append(filename + ": Dataset description mismatch")
+                export=facts['exports'].get(name)
                 dataset = {"@context": "https://schema.org", "@type": "Dataset",
                            "@id": manifest["site_base_url"] + lang.path('/' + slugs[name] + '/') + "#dataset",
                            "name": tr.text("dataset_name", model=name), "description": description,
                            "url": manifest["site_base_url"] + lang.path('/' + slugs[name] + '/'),
-                           "isBasedOn": data["source"], "inLanguage": lang.code,
-                           "spatialCoverage": [{"@type": "Place", "name": r} for r in sorted({r["region"] for r in data["offers"]}, key=lambda r: r or "")],
+                           "isBasedOn": export["source"] if export else [], "inLanguage": lang.code,
+                           "spatialCoverage": [{"@type": "Place", "name": r or tr.text('unknown_region')} for r in sorted({r["region"] for r in export["offers"]} if export else set(), key=lambda r: r or "")],
                            "variableMeasured": {"@type": "PropertyValue", "name": "price_per_gpu_hour", "unitText": "USD/GPU-hour"},
                            }
                 if name in facts['exports']:
                     dataset['distribution']={'@type':'DataDownload','encodingFormat':'application/json','contentUrl':manifest['site_base_url']+'/data/'+slugs[name]+'.json'}
-                if data["last_updated"]:
-                    dataset["dateModified"] = data["last_updated"]
-                if data["offers"]:
+                    from .search_audit import model_copy
+                    dataset['description']=tr.text('dataset_name',model=name)+'. '+model_copy(name,export,tr)[1]
+                    currencies=sorted({r['currency'] for r in export['offers']}) or [export['currency']]
+                    variables=[{'@type':'PropertyValue','name':'price_per_gpu_hour','unitText':c+'/GPU-hour'} for c in currencies]
+                    dataset['variableMeasured']=variables[0] if len(variables)==1 else variables
+                if export and export["last_updated"]:
+                    dataset["dateModified"] = export["last_updated"]
+                if export and export["offers"]:
                     dataset["temporalCoverage"] = facts["date"]
+                if not export:
+                    dataset={'@context':'https://schema.org','@type':'WebPage','name':title,'description':description,'url':manifest['site_base_url']+lang.path('/'+slugs[name]+'/'),'inLanguage':lang.code}
                 _compare(page.structured[0], dataset, filename + "/Dataset", errors)
             elif page.structured and page.structured[0].get("description") != description:
                 errors.append(filename + ": structured description differs from statistics")
@@ -683,11 +715,16 @@ def _audit(conn, out):
                 if stamp not in allowed_times or text not in {stamp[:10],clock}:
                     errors.append(filename + ": observation timestamp mismatch")
             html_pages += 1
+    from .search_audit import audit_search
+    extra_files, seo_counts = audit_search(facts, manifest, out, errors, parsed_main=parsed_main)
+    expected_files.update(extra_files)
+    html_pages+=seo_counts.pop('extra_html_pages')
+    checked+=seo_counts.pop('additional_values_checked')
     if set(manifest["files"]) != expected_files:
         errors.append("manifest: missing or unexpected audited files")
     if errors:
         raise AuditError("Statistics audit FAILED (" + str(len(errors)) + " mismatches):\n" + "\n".join(errors[:40]))
-    return {"status": "passed", "html_pages": html_pages, "json_exports": len(facts["exports"]), "values_checked": checked,
+    return {"status": "passed", "html_pages": html_pages, "json_exports": len(facts["exports"]), "values_checked": checked, **seo_counts,
             "observation_day": facts["date"], "basis": "current standard/unspecified-region whole-GPU USD; separate types; tax excluded/unknown; A-only exports"}
 
 

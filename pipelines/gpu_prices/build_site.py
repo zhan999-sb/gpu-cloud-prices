@@ -18,10 +18,12 @@ from .providers.azure import SOURCE_DOC
 from .schema import Offer, parse_utc, utc_now
 from .store import PriceStore, ROOT
 from .regions import eligible, region_class, REGION_SOURCES
-from .links import link_for, PROVIDER_ONLY
+from .links import link_for, PROVIDER_ONLY, PROVIDER_LINKS
 from .providers.registry import PROVIDERS
 from .partners import surflare
 from .models import category, popular_rank, headline_order, POPULAR, CATEGORIES, model_family
+from . import search
+from .search_specs import PAIRS, REFERENCES, SPECS
 
 DEFAULT_OUT = ROOT / "site_i18n_preview"
 DEFAULT_SITE_BASE_URL = "https://example.pages.dev"
@@ -33,8 +35,9 @@ PAGE = Template("""<!DOCTYPE html>
 <link rel="canonical" href="$canonical"/>
 $alternates<meta property="og:type" content="website"/><meta property="og:site_name" content="$site_name"/>
 <meta property="og:title" content="$title"/><meta property="og:description" content="$description"/><meta property="og:url" content="$canonical"/>
-<meta name="theme-color" content="#185bc0"/><link rel="icon" href="$origin/favicon.svg" type="image/svg+xml"/><meta property="og:image" content="$origin/og.svg"/>
-<meta name="twitter:card" content="summary"/><meta name="twitter:title" content="$title"/><meta name="twitter:description" content="$description"/>
+<meta name="theme-color" content="#185bc0"/><link rel="icon" href="$origin/favicon.svg" type="image/svg+xml"/><meta property="og:image" content="$social_image"/>
+<meta property="og:image:alt" content="$title"/><meta name="twitter:image" content="$social_image"/><meta name="twitter:image:alt" content="$title"/>
+<meta name="twitter:card" content="$social_card"/><meta name="twitter:title" content="$title"/><meta name="twitter:description" content="$description"/>
 $robots$structured<style>$css</style></head>
 <body><a class="skip" href="#main">$skip</a><header><a class="brand" href="$home">$site_name</a><nav aria-label="$navigation"><a href="$home">$nav_home</a><a href="$models_path">$nav_models</a><a href="$method_path">$method_label</a></nav>$switcher</header>
 <main id="main">$placeholder$body
@@ -57,7 +60,7 @@ def model_slugs(models) -> dict[str, str]:
     model's unambiguous URL (e.g. 'GPU 2' alongside two variants of 'GPU').
     """
     ordered = sorted(set(models), key=lambda model: (model.casefold(), model))
-    reserved = {"data", "index", "methodology", "404", "robots", "sitemap"} | {lang.prefix for lang in LANGUAGES if lang.prefix}
+    reserved = {"data", "index", "methodology", "404", "robots", "sitemap", "providers", "compare", "social"} | {lang.prefix for lang in LANGUAGES if lang.prefix}
     natural = {model_slug(model) for model in ordered}
     used, result = set(reserved), {}
     for model in ordered:
@@ -103,11 +106,16 @@ def _language_links(tr: Catalog, route: str) -> str:
         + '>' + escape(lang.name) + '</a>' for lang in LANGUAGES) + '</nav></details>'
 
 
-def _page(title, body, updated, built, *, origin, route, tr, description, structured=None, noindex=False):
+def _page(title, body, updated, built, *, origin, route, tr, description, structured=None, noindex=False, social_image=None, crumbs=None):
     path = tr.language.path(route)
+    structured = list(structured) if isinstance(structured, list) else [structured] if structured else []
+    crumbs = crumbs or [(tr.text('nav_home'), '/')]+([(title,route)] if route!='/' else [])
+    trail, breadcrumb = search.breadcrumb(crumbs, tr, origin, route)
+    structured.append(breadcrumb)
+    body = trail + body
     # HTML escaping corrupts JSON strings; JSON escapes keep it parseable and
     # prevent model/region text from closing the inert application/ld+json block.
-    return PAGE.substitute(origin=origin, nav_home=tr.html("nav_home"), nav_models=tr.html("nav_models"), models_path=tr.language.path()+"#models", disclosure=tr.html("disclosure"), title=escape(title), page_title=tr.html("page_title", title=title, site_name=tr.text("site_name")),
+    return PAGE.substitute(origin=origin, social_image=escape(origin+(social_image or '/og.svg'),quote=True), social_card='summary_large_image' if social_image else 'summary', nav_home=tr.html("nav_home"), nav_models=tr.html("nav_models"), models_path=tr.language.path()+"#models", disclosure=tr.html("disclosure"), title=escape(title), page_title=tr.html("page_title", title=title, site_name=tr.text("site_name")),
                            lang=tr.language.code, site_name=tr.html("site_name"), description=escape(description, quote=True),
                            canonical=escape(origin + path, quote=True),
                            alternates=''.join('<link rel="alternate" hreflang="' + code + '" href="'
@@ -375,7 +383,7 @@ def _offer_card(row, path, tr, *, group='offers', model_url=None):
     body = '<article class="offer-card" '+ ' '.join(k+'="'+escape(v,quote=True)+'"' for k,v in attrs.items())+'><div class="offer-hardware"><h3>'
     allocation = (_stat(path+'/gpu_count',o['gpu_count'],'number')+'×' if o['gpu_count'] is not None else tr.html('unknown_allocation'))
     body += _stat(path+'/gpu_model',o['gpu_model'],'text')+' <small class="allocation">'+allocation+'</small></h3><div class="offer-specs">'
-    body += '<div class="offer-badges"><span class="provider-pill">'+escape(PROVIDERS.get(o['provider'],{}).get('name',o['provider']))+'</span>'+_badge(o['price_type'],tr)+_badge('tax_'+o['tax_basis'],tr)
+    body += '<div class="offer-badges"><span class="provider-pill"><a href="'+tr.language.path('/providers/'+search.provider_slug(o['provider'])+'/')+'">'+escape(PROVIDERS.get(o['provider'],{}).get('name',o['provider']))+'</a></span>'+_badge(o['price_type'],tr)+_badge('tax_'+o['tax_basis'],tr)
     body += _badge(_tier_key(o['tier']), tr)
     if o['provider']=='clore':body+=_badge('community_marketplace',tr)
     if o['provider']=='ai_galaxy':body+=_badge('promo_floor_price',tr)
@@ -557,29 +565,25 @@ def _home(offers, models, slugs, today, coverage, tr, model_data):
     return body,tr.text('home_title',**numbers),tr.text('home_description',**numbers)
 
 
-def _faq(model, stats, today, tr):
+def _faq(model, stats, today, tr, data):
     demand, spot = stats['cheapest']['on_demand'], stats['cheapest']['spot']
     comparison = tr.text('no_discount') if stats['spot_no_discount'] else (tr.text('discount_below',percent=f"{stats['spot_discount_percent']:.2f}") if stats['spot_discount_percent'] is not None else tr.text('not_observed'))
     answers = [tr.text('faq_cheapest_a',demand=_money(demand) if demand is not None else tr.text('not_observed'),spot=_money(spot) if spot is not None else tr.text('not_observed'),regions=stats['region_count'],offers=stats['offers'],date=today),
                tr.text('faq_spot_a',comparison=comparison),tr.text('faq_units_a')]
     questions = [tr.text('faq_cheapest_q',model=model),tr.text('faq_spot_q'),tr.text('faq_units_q')]
-    return list(zip(questions,answers))
+    return list(zip(questions+[tr.text('search_trend_q')],answers+[search.trend_text(data,tr)]))
 
 
-def _model(model, data, today, coverage, tr, origin, route, export_path):
+def _model(model, data, today, coverage, tr, origin, route, export_path, export_data):
     current,stats,updated=data['offers'],data['statistics'],data['last_updated']
     base=_pointer('models',model)
-    if current:
-        title=tr.text('model_title',model=model,price=_money(stats['cheapest']['on_demand']) if stats['cheapest']['on_demand'] is not None else tr.text('not_observed'),
-            spot_price=_money(stats['cheapest']['spot']) if stats['cheapest']['spot'] is not None else tr.text('not_observed'),count=tr.quantity('offer_count',stats['offers']),regions=tr.quantity('azure_region_count',stats['region_count']),date=updated[:10])
-    else:
-        title=tr.text('model_empty_title',model=model,count=tr.quantity('offer_count',0),regions=tr.quantity('azure_region_count',0),date=today)
-        if updated:title=tr.text('last_observed',title=title,date=updated[:10])
-    description=tr.text('model_description',title=title)
-    body='<section class="hero"><h1>'+escape(model)+'</h1><p>'+tr.html('offers_subtitle')+'</p></section>'
+    title=search.title(model,data,tr)
+    description=title+'. '+search.intro(data,tr)
+    body='<section class="hero"><h1>'+escape(title)+'</h1><p data-search="intro">'+escape(search.intro(data,tr))+'</p><p data-search="trend">'+escape(search.trend_text(data,tr))+'</p><p>'+tr.html('search_limits')+'</p></section>'
     if not current:body+='<p class="notice">'+tr.html('stale')+'</p>'
     else:
-        body+=_offer_browser([(base+'/offers/'+str(i),o) for i,o in enumerate(current)],tr)
+        body+=_offer_browser(search.model_chunk(data,model),tr)
+        body+=search.pagination(model,len(current),route.strip('/'),tr)
         body+='<details class="comparison"><summary>'+tr.html('how_compare')+'</summary>'+_price_cards(model,stats,tr)+'<p>'+tr.html('basis')+'</p>'+coverage+'</details>'
         body+=_model_content(model,stats,today,tr)
     body+='<h2>'+tr.html('history_heading')+'</h2><p>'+tr.html('history_intro')+'</p><p>'+tr.html('history_aggregation_note')+'</p>'
@@ -587,17 +591,80 @@ def _model(model, data, today, coverage, tr, origin, route, export_path):
         if series:body+='<h3>'+tr.html(kind)+'</h3>'+_chart(series,kind,tr,base+'/history/'+kind)
     if export_path:
         body+='<p><a href="'+export_path+'">'+tr.html('download')+'</a></p>'
-    dataset={"@context":"https://schema.org","@type":"Dataset","@id":origin+tr.language.path(route)+'#dataset',"name":tr.text('dataset_name',model=model),"description":description,"url":origin+tr.language.path(route),"isBasedOn":data["source"],"inLanguage":tr.language.code,
-        "spatialCoverage":[{"@type":"Place","name":r} for r in sorted({r['region'] for r in stats['regions']},key=lambda r:r or '')],"variableMeasured":{"@type":"PropertyValue","name":"price_per_gpu_hour","unitText":"USD/GPU-hour"},}
-    if export_path:dataset['distribution']={'@type':'DataDownload','encodingFormat':'application/json','contentUrl':origin+export_path}
-    if updated:dataset['dateModified']=updated
-    if current:dataset['temporalCoverage']=today
+    if export_data is not None:
+        currencies=sorted({o['currency'] for o in export_data['offers']}) or [export_data['currency']]
+        variables=[{'@type':'PropertyValue','name':'price_per_gpu_hour','unitText':c+'/GPU-hour'} for c in currencies]
+        dataset={"@context":"https://schema.org","@type":"Dataset","@id":origin+tr.language.path(route)+'#dataset',"name":tr.text('dataset_name',model=model),"description":tr.text('dataset_name',model=model)+'. '+search.intro(export_data,tr),"url":origin+tr.language.path(route),"isBasedOn":export_data["source"],"inLanguage":tr.language.code,
+            "spatialCoverage":[{"@type":"Place","name":r or tr.text('unknown_region')} for r in sorted({r['region'] for r in export_data['offers']},key=lambda r:r or '')],"variableMeasured":variables[0] if len(variables)==1 else variables,
+            'distribution':{'@type':'DataDownload','encodingFormat':'application/json','contentUrl':origin+export_path}}
+        if export_data['last_updated']:dataset['dateModified']=export_data['last_updated']
+        if export_data['offers']:dataset['temporalCoverage']=today
+    else:
+        dataset={"@context":"https://schema.org","@type":"WebPage","name":title,"description":description,"url":origin+tr.language.path(route),"inLanguage":tr.language.code}
     structured=[dataset]
     if current:
-        faqs=_faq(model,stats,today,tr)
+        faqs=_faq(model,stats,today,tr,data)
         body+='<section class="faq"><h2>'+tr.html('faq_heading',model=model)+'</h2>'+''.join('<details><summary>'+escape(q)+'</summary><p data-faq="'+str(i)+'">'+escape(a)+'</p></details>' for i,(q,a) in enumerate(faqs))+'</section>'
         structured.append({"@context":"https://schema.org","@type":"FAQPage","inLanguage":tr.language.code,"url":origin+tr.language.path(route),"mainEntity":[{"@type":"Question","name":q,"acceptedAnswer":{"@type":"Answer","text":a}} for q,a in faqs]})
     return title,description,body,structured
+
+
+def _provider_page(key, model_data, slugs, today, tr):
+    provider=PROVIDERS[key]
+    local=[(p,o) for p,o in search.entries(model_data) if o['provider']==key]
+    good=[(p,o) for p,o in local if eligible(Offer(**o))]
+    title=tr.text('provider_title',provider=provider['name'],date=today)
+    intro=tr.text('provider_intro',provider=provider['name'])
+    body='<h1>'+escape(title)+'</h1><p>'+escape(intro)+'</p><p>'+_badge(_tier_key(provider['tier']),tr)+' '+tr.html(provider['note'])+'</p>'
+    # Numeric prose is audited as a complete sentence against independent SQL.
+    body+='<p data-search="provider-counts">'+tr.html('provider_counts',offers=len(local),eligible=len(good),models=len({o['gpu_model'] for _,o in local}))+'</p>'
+    body+='<p><a href="'+escape(provider['source'],quote=True)+'">'+tr.html('source')+'</a></p>'
+    if key in PROVIDER_LINKS:
+        body+=_outbound(key,'',None,'on_demand',None,tr)
+    rows=[]
+    for model in sorted({o['gpu_model'] for _,o in local}):
+        items=[(p,o) for p,o in local if o['gpu_model']==model]
+        valid=[(p,o) for p,o in good if o['gpu_model']==model]
+        best=min(valid,key=lambda p:p[1]['price_per_gpu_hour']) if valid else None
+        rows.append('<tr><td><a href="'+tr.language.path('/'+slugs[model]+'/')+'">'+escape(model)+'</a></td><td data-search="count:'+escape(model,quote=True)+'">'+str(len(items))+'</td><td data-search="eligible:'+escape(model,quote=True)+'">'+str(len(valid))+'</td><td>'+(_stat(best[0]+'/price_per_gpu_hour',best[1]['price_per_gpu_hour'])+' '+tr.html(best[1]['price_type']) if best else tr.html('not_observed'))+'</td></tr>')
+    body+='<h2>'+tr.html('provider_cheapest')+'</h2>'+_table([tr.text('gpu_model'),tr.text('offers'),tr.text('eligible_offers'),tr.text('cheapest_gpu_hour')],rows,tr.text('provider_cheapest'))
+    body+='<p>'+tr.html('search_limits')+'</p>'
+    # Full cards preserve source, availability, original prices and fee labels.
+    selected=search.ordered(good)[:3]
+    if selected:body+=_offer_browser(selected,tr)
+    local_names={o['gpu_model'] for _,o in local}
+    pairs=[(slug,pair) for slug,pair in PAIRS.items() if any(local_names.intersection(search.family_models(model_data,f)) for f in pair)]
+    body+='<nav><h2>'+tr.html('comparisons_heading')+'</h2>'+''.join('<p><a href="'+tr.language.path('/compare/'+slug+'/')+'">'+tr.html('compare_label',left=pair[0],right=pair[1])+'</a></p>' for slug,pair in pairs)+'</nav>'
+    return title,intro,body,len(good)
+
+
+def _comparison_page(slug, model_data, slugs, today, tr):
+    left,right=PAIRS[slug]
+    family_names={f:set(search.family_models(model_data,f)) for f in (left,right)}
+    title=tr.text('compare_title',left=left,right=right,date=today)
+    description=tr.text('compare_intro')
+    body='<h1>'+escape(title)+'</h1><p>'+escape(description)+'</p><p>'+tr.html('search_limits')+'</p>'
+    rows=[]
+    totals=[]
+    for family in (left,right):
+        names=sorted(family_names[family])
+        totals.append(sum(model_data[m]['statistics']['offers'] for m in names))
+        for model in names:
+            stats=model_data[model]['statistics'];p=_pointer('models',model,'statistics')
+            rows.append('<tr><td><a href="'+tr.language.path('/'+slugs[model]+'/')+'">'+escape(model)+'</a></td><td>'+_stat(p+'/offers',stats['offers'],'number')+'</td>'+''.join('<td>'+_value(p+'/cheapest/'+kind,stats['cheapest'][kind],tr)+'</td>' for kind in ('on_demand','spot'))+'</tr>')
+    body+=_table([tr.text(k) for k in ('gpu_model','offers','cheapest_on_demand','cheapest_spot')],rows,tr.text('spread_caption'))
+    spec_rows=[]
+    for family in (left,right):
+        model=REFERENCES[family];spec=SPECS[model];p=_pointer('specs',model)
+        spec_rows.append('<tr>'+_cell(model)+''.join('<td>'+_stat(p+'/'+k,spec[k],'number')+'</td>' for k in ('vram','bandwidth','fp16','bf16'))+'<td>'+tr.html(spec['condition'])+'</td></tr>')
+    body+='<h2>'+tr.html('reference_specs')+'</h2><p>'+tr.html('spec_note')+'</p>'+_table([tr.text(k) for k in ('gpu_model','spec_vram','spec_bandwidth','spec_fp16','spec_bf16','spec_conditions')],spec_rows,tr.text('reference_specs'))
+    body+='<h2>'+tr.html('spec_sources')+'</h2><ul>'+''.join('<li><a href="'+SPECS[REFERENCES[f]]['source']+'">'+escape(REFERENCES[f])+'</a></li>' for f in (left,right))+'</ul>'
+    local=[(p,o) for p,o in search.entries(model_data) if o['gpu_model'] in family_names[left]|family_names[right] and eligible(Offer(**o))]
+    selected=[]
+    for family in (left,right):
+        selected+=search.ordered([(p,o) for p,o in local if o['gpu_model'] in family_names[family]])[:1]
+    if selected:body+=_offer_browser(selected,tr)
+    return title,description,body,min(totals)
 
 
 def _methodology(coverage, tr):
@@ -637,16 +704,17 @@ def build_site(store: PriceStore, out: str | Path = DEFAULT_OUT, *, today: str |
     all_today = store.current_prices(today, built)
     run = store.latest_run()
     complete_snapshot = True
-    offers = all_today
+    offers = [o for o in all_today if parse_utc(o.collected_at)<=parse_utc(built)]
     provider_coverage = coverage_data(store, today)
-    models = store.models()
+    observed_rows=[r for r in store.observation_rows() if parse_utc(r['collected_at'])<=parse_utc(built)]
+    models = sorted({r['gpu_model'] for r in observed_rows})
     slugs = model_slugs(models)
-    exportable_models = {r['gpu_model'] for r in store.observation_rows() if r['tier']=='A' and r['export_allowed']}
+    exportable_models = {r['gpu_model'] for r in observed_rows if r['tier']=='A' and r['export_allowed']}
     exports, model_data, pages, sitemap_entries = {}, {}, {}, {}
     for model in models:
         current = [offer for offer in offers if offer.gpu_model == model]
-        updated = max((o.collected_at for o in current), default=store.last_updated(model))
-        histories = {kind: store.daily_series(model, price_type=kind) for kind in ("on_demand", "spot")}
+        updated = max((o.collected_at for o in current), default=max(r['collected_at'] for r in observed_rows if r['gpu_model']==model))
+        histories = {kind: [p for p in store.daily_series(model, price_type=kind) if p['day']<=today] for kind in ("on_demand", "spot")}
         if complete_snapshot:
             for kind, series in histories.items():
                 histories[kind] = [point for point in series if point["day"] != today]
@@ -662,18 +730,20 @@ def build_site(store: PriceStore, out: str | Path = DEFAULT_OUT, *, today: str |
         if model in exportable_models:
             exports['data/' + slugs[model] + '.json'] = {**data, 'offers': [o.to_dict() for o in current if o.tier == 'A' and o.export_allowed], 'statistics': model_statistics([o for o in current if o.tier == 'A' and o.export_allowed], at=built), 'history': {kind: store.daily_series(model, price_type=kind, export_only=True) for kind in ('on_demand','spot')}}
             for kind, series in exports['data/' + slugs[model] + '.json']['history'].items():
-                series[:] = [point for point in series if point['day'] != today]
+                series[:] = [point for point in series if point['day'] < today]
                 values = [o.price_per_gpu_hour for o in current if o.price_type == kind and eligible(o) and o.tier == 'A' and o.export_allowed]
                 if values:
                     series.append({'day': today, 'currency': 'USD', 'price_type': kind, 'min': min(values), 'median': median(values), 'max': max(values), 'count': len(values)})
             artifact = exports['data/' + slugs[model] + '.json']
-            history_rows = [o for o in store.latest_prices(gpu_model=model) if o.tier=='A' and o.export_allowed]
+            history_rows = [o for o in store.latest_prices(gpu_model=model) if o.tier=='A' and o.export_allowed and parse_utc(o.collected_at)<=parse_utc(built)]
             artifact['last_updated'] = max((o.collected_at for o in history_rows),default=None)
             artifact['source'] = sorted({PROVIDERS[o.provider]['source'] for o in history_rows if o.provider in PROVIDERS}) or [SOURCE_DOC]
             permitted = [o for o in current if o.tier=='A' and o.export_allowed]
             artifact['currency'] = next(iter({o.currency for o in permitted})) if len({o.currency for o in permitted})==1 else 'USD' if not permitted else 'MULTI'
             artifact['latest_collection'] = max((r for r in store.provider_runs().values() if r['provider'] in {o.provider for o in history_rows}),key=lambda r:r['id'],default=None)
-    last_updated = store.last_updated()
+    last_updated = max((r['collected_at'] for r in observed_rows),default=None)
+    tracked = sorted({r['provider'] for r in observed_rows})
+    site_noindex = sum(d['statistics']['offers'] for d in model_data.values()) < 3
     counts = {}
     for lang in LANGUAGES:
         tr = catalogs[lang.code]
@@ -682,24 +752,43 @@ def build_site(store: PriceStore, out: str | Path = DEFAULT_OUT, *, today: str |
         website = {"@context": "https://schema.org", "@type": "WebSite", "name": tr.text("site_name"),
                    "url": origin + lang.path(), "description": description, "inLanguage": lang.code}
         pages[_page_file(lang.path())] = _page(title, body, last_updated, built, origin=origin, route="/", tr=tr,
-                                               description=description, structured=website)
+                                               description=description, structured=website, noindex=site_noindex)
         for route in ('/', '/methodology'):
-            sitemap_entries[lang.path(route)] = (last_updated or built, route)
+            if not site_noindex:sitemap_entries[lang.path(route)] = (last_updated or built, route)
         for model in models:
             route, export_path = '/' + slugs[model] + '/', ('/data/' + slugs[model] + '.json') if model in exportable_models else None
             data = model_data[model]
-            title, description, body, dataset = _model(model, data, today, coverage + _provider_coverage(provider_coverage,tr), tr, origin, route, export_path)
-            noindex = len(data["offers"]) < 3
+            title, description, body, dataset = _model(model, data, today, coverage + _provider_coverage(provider_coverage,tr), tr, origin, route, export_path, exports.get(export_path.lstrip('/')) if export_path else None)
+            body+=search.related(model,data,model_data,slugs,tr)
+            noindex = data['statistics']['offers'] < 3
             pages[_page_file(lang.path(route))] = _page(title, body, data["last_updated"], built, origin=origin,
-                route=route, tr=tr, description=description, structured=dataset, noindex=noindex)
+                route=route, tr=tr, description=description, structured=dataset, noindex=noindex,
+                social_image='/social/'+slugs[model]+'.png')
             if not noindex:
                 sitemap_entries[lang.path(route)] = (data["last_updated"] or built, route)
+            for number in range(1,(len(data['offers'])+search.OFFER_PAGE_SIZE-1)//search.OFFER_PAGE_SIZE):
+                subroute=route+'offers/'+str(number+1)+'/'
+                sub_title=tr.text('offer_page',model=model,number=number+1)
+                sub_body='<h1>'+escape(sub_title)+'</h1><p>'+tr.html('search_limits')+'</p>'+_offer_browser(search.model_chunk(data,model,number),tr)+search.pagination(model,len(data['offers']),slugs[model],tr)
+                pages[_page_file(lang.path(subroute))]=_page(sub_title,sub_body,data['last_updated'],built,origin=origin,route=subroute,tr=tr,description=tr.text('offer_pages_note'),noindex=True,
+                    crumbs=[(tr.text('nav_home'),'/'),(model,route),(sub_title,subroute)])
+        for key in tracked:
+            route='/providers/'+search.provider_slug(key)+'/'
+            title,description,body,count=_provider_page(key,model_data,slugs,today,tr)
+            updated=max((r.collected_at for r in offers if r.provider==key),default=last_updated)
+            pages[_page_file(lang.path(route))]=_page(title,body,updated,built,origin=origin,route=route,tr=tr,description=description,noindex=count<3)
+            if count>=3:sitemap_entries[lang.path(route)]=(updated or built,route)
+        for slug in PAIRS:
+            route='/compare/'+slug+'/'
+            title,description,body,count=_comparison_page(slug,model_data,slugs,today,tr)
+            pages[_page_file(lang.path(route))]=_page(title,body,last_updated,built,origin=origin,route=route,tr=tr,description=description,noindex=count<3)
+            if count>=3:sitemap_entries[lang.path(route)]=(last_updated or built,route)
         method_title = tr.text("method_title")
         method_description = tr.text("method_description", count=tr.quantity("offer_count", len([o for o in offers if eligible(o)])),
                                      models=tr.quantity("model_count", len({o.gpu_model for o in offers if eligible(o)})),
                                      regions=tr.quantity("region_count", len({o.region for o in offers if eligible(o)})), date=today)
         for route, title, description, body, noindex in (
-            ("/methodology", method_title, method_description, _methodology(coverage, tr), False),
+            ("/methodology", method_title, method_description, _methodology(coverage, tr), site_noindex),
             ("/404.html", tr.text("not_found"), tr.text("not_found_description"),
              '<h1>' + tr.html("not_found") + '</h1><p>' + tr.html("not_found_description") + '</p><ul>' + ''.join(
                  '<li><a href="' + other.path() + '" lang="' + other.code + '">' + escape(other.name) + '</a></li>' for other in LANGUAGES)
@@ -709,7 +798,7 @@ def build_site(store: PriceStore, out: str | Path = DEFAULT_OUT, *, today: str |
                           "description": description, "url": origin + path, "inLanguage": lang.code}
             pages[_page_file(path)] = _page(title, body, last_updated, built, origin=origin, route=route, tr=tr,
                                             description=description, structured=structured, noindex=noindex)
-        counts[lang.code] = len(models) + 3  # Home, methodology, localized 404, models.
+        counts[lang.code] = sum(1 for filename in pages if filename.startswith(lang.prefix+'/')) if lang.prefix else sum(1 for filename in pages if filename.split('/')[0] not in {l.prefix for l in LANGUAGES if l.prefix})
     namespace, xhtml = "http://www.sitemaps.org/schemas/sitemap/0.9", "http://www.w3.org/1999/xhtml"
     ET.register_namespace("", namespace)
     ET.register_namespace("xhtml", xhtml)
@@ -723,7 +812,26 @@ def build_site(store: PriceStore, out: str | Path = DEFAULT_OUT, *, today: str |
     other = {"favicon.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#185bc0"/><path d="M16 44V28h8v16zm12 0V20h8v24zm12 0V12h8v32z" fill="white"/></svg>',
              "og.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630"><rect width="1200" height="630" fill="#10223e"/><path d="M80 470V330h55v140zm85 0V240h55v230zm85 0V150h55v320z" fill="#83b5ff"/><text x="370" y="280" fill="white" font-family="system-ui,sans-serif" font-size="64">GPU Price Index</text><text x="370" y="355" fill="#a8b8cf" font-family="system-ui,sans-serif" font-size="30">Multi-provider / GPU / USD</text></svg>',
              "sitemap.xml": '<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(sitemap, encoding="unicode") + '\n',
-             "robots.txt": 'User-agent: *\nAllow: /\n\nSitemap: ' + origin + '/sitemap.xml\n'}
+             "robots.txt": 'User-agent: *\nAllow: /\n\nSitemap: ' + origin + '/sitemap.xml\n'+''.join('Sitemap: '+origin+'/sitemap-'+l.code+'.xml\n' for l in LANGUAGES)}
+    # Per-language sitemap files contain exactly their indexable HTML URLs.
+    for lang in LANGUAGES:
+        localized=ET.Element('{'+namespace+'}urlset')
+        prefix=lang.path()
+        for entry in sitemap:
+            url=entry.find('{'+namespace+'}loc').text
+            local_path=url[len(origin):]
+            language_match=(local_path.startswith(prefix) if lang.prefix else not any(local_path.startswith('/'+l.prefix+'/') for l in LANGUAGES if l.prefix))
+            if language_match:localized.append(entry)
+        other['sitemap-'+lang.code+'.xml']='<?xml version="1.0" encoding="UTF-8"?>\n'+ET.tostring(localized,encoding='unicode')+'\n'
+    for model,data in model_data.items():
+        other['social/'+slugs[model]+'.png']=search.social_png(model,data)
+    # Hard build gate: no model landing or continuation can grow past 300 KB.
+    for lang in LANGUAGES:
+        for slug in slugs.values():
+            prefix=lang.path('/'+slug+'/').lstrip('/')
+            for filename,content in pages.items():
+                if filename.startswith(prefix) and len(content.encode('utf-8'))>300_000:
+                    raise ValueError('Model HTML exceeds 300 KB: '+filename)
     # Replace only manifest-owned files within output; preserve unrelated files.
     manifest = output / "gpu-prices-manifest.json"
     previous = json.loads(manifest.read_text(encoding="utf-8")).get("files", []) if manifest.exists() else []
@@ -757,7 +865,7 @@ def _owned_target(output: Path, filename) -> Path | None:
     if (not isinstance(filename, str) or not filename or '\\' in filename
             or any(part in ("", ".", "..") for part in filename.split('/'))
             or Path(filename).is_absolute() or ':' in filename
-            or not filename.endswith((".html", ".json", ".xml", ".txt", ".svg"))):
+            or not filename.endswith((".html", ".json", ".xml", ".txt", ".svg", ".png"))):
         return None
     target = output / filename
     if not target.resolve().is_relative_to(output.resolve()):
@@ -768,5 +876,6 @@ def _owned_target(output: Path, filename) -> Path | None:
 def _write(path: Path, content: str):
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(content, encoding="utf-8", newline="\n")
+    if isinstance(content,bytes):temporary.write_bytes(content)
+    else:temporary.write_text(content, encoding="utf-8", newline="\n")
     temporary.replace(path)

@@ -7,6 +7,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 import sqlite3
+import sys
 from time import perf_counter
 
 from .build_site import DEFAULT_OUT, build_site
@@ -25,6 +26,15 @@ from .audit import audit_site, live_sample
 LOG = logging.getLogger(__name__)
 
 
+class _CurrentStderr:
+    """CLI re-entry must not retain a closed redirected/captured stderr."""
+    def write(self, text):
+        return sys.stderr.write(text)
+
+    def flush(self):
+        return sys.stderr.flush()
+
+
 def positive_int(value: str) -> int:
     result = int(value)
     if result < 1:
@@ -37,7 +47,7 @@ def configure_logging() -> None:
     folder.mkdir(parents=True, exist_ok=True)
     handler = RotatingFileHandler(folder / "gpu_prices.log", maxBytes=2_000_000, backupCount=2, encoding="utf-8")
     logging.basicConfig(level=logging.INFO, format="%(asctime)sZ %(levelname)s %(name)s: %(message)s",
-                        handlers=[handler, logging.StreamHandler()], force=True)
+                        handlers=[handler, logging.StreamHandler(_CurrentStderr())], force=True)
     import time
     logging.Formatter.converter = time.gmtime
 
