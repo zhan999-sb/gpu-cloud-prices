@@ -8,11 +8,12 @@ import re
 from . import Document, ParseError, finish, memory, money, normalize_gpu, one, record, require
 
 URLS = ("https://featurize.cn/vm/available",)
-TIER = "B"
+TIER = "C"  # Agreement 7.1/7.3 restrict reuse of site materials: display only.
 
 
 def parse(html: str, fetched_at: str) -> list[dict]:
     doc = Document(html)
+    per_card = bool(re.search(r"每(?:张)?卡(?:租赁|租用|出租|计费)|按卡(?:租赁|租用|计费)|单卡(?:实例|租赁|租用|出租)", doc.root.text()))
     cards = [n for n in doc.root.find(tag="div")
              if any(c.startswith("host-machine_root__")
                     for c in n.attrs.get("class", "").split())]
@@ -42,6 +43,7 @@ def parse(html: str, fetched_at: str) -> list[dict]:
         rows.append(record(
             "featurize", TIER, URLS[0], fetched_at,
             product="按量使用实例", sku=title, gpu_model_raw=gpu.group(1),
+            gpu_count=1 if per_card else None, gpu_fraction=1.0 if per_card else None,
             gpu_model=normalize_gpu(gpu.group(1), vram), vram_raw=vram,
             vcpu=int(cpu.group(1)), ram_raw=memory(ram.group(1)),
             price_per_hour=money(price.group(1)), currency="CNY",

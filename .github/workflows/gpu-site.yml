@@ -2,7 +2,7 @@ name: GPU site
 
 on:
   schedule:
-    - cron: '17 */6 * * *'
+    - cron: '*/15 * * * *'
   workflow_dispatch:
   push:
     branches: [main]
@@ -62,9 +62,19 @@ jobs:
         id: restore
         run: bash ci/restore_db.sh data/gpu_prices.sqlite ci/runtime/history-base
 
+      # A freshness-only deploy must not force a data-branch write. Its receipt
+      # is also SQLite; a cache miss safely causes another audited deployment.
+      - name: Restore latest successful deployment receipt
+        uses: actions/cache/restore@v4.2.3
+        with:
+          path: ci/runtime/deploy-receipt.sqlite
+          key: gpu-deploy-main-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: gpu-deploy-main-
+
       - name: Run offline pipeline tests
         run: |
-          python -m pytest tests/test_gpu_prices.py -q -p no:cacheprovider --basetemp ci/runtime/pipeline-tests --junitxml ci/reports/pipeline-tests.xml
+          mkdir -p ci/runtime
+          python -m pytest tests/test_gpu_*.py -q -p no:cacheprovider --basetemp ci/runtime/pipeline-tests --junitxml ci/reports/pipeline-tests.xml
           python -m unittest discover -s ci/tests -v 2>&1 | tee ci/reports/ci-tests.log
 
       - name: Collect prices and apply provider failure policy
@@ -78,17 +88,25 @@ jobs:
           cat ci/reports/collect.log
           python ci/collection_gate.py ci/reports/collect.json "$code"
 
+      - name: Decide whether prices or deployment freshness require a build
+        id: refresh
+        run: |
+          python -m ci.refresh_policy decide --db data/gpu_prices.sqlite --receipt ci/runtime/deploy-receipt.sqlite --github-output "$GITHUB_OUTPUT" | tee ci/reports/refresh.json
+
       - name: Build production site
         id: build
+        if: success() && steps.refresh.outputs.build == 'true'
         run: |
-          python -m pipelines.gpu_prices.run build --db data/gpu_prices.sqlite --out ci/runtime/site --site-base-url https://gpu-cloud-prices.pages.dev 2>ci/reports/build.log | tee ci/reports/build.json
+          python -m pipelines.gpu_prices.run build --db data/gpu_prices.sqlite --out ci/runtime/site --site-base-url https://gpu-cloud-prices.pages.dev --as-of '${{ steps.refresh.outputs.snapshot_at }}' 2>ci/reports/build.log | tee ci/reports/build.json
 
       - name: Audit published statistics
         id: audit
+        if: success() && steps.refresh.outputs.build == 'true'
         run: |
           python -m pipelines.gpu_prices.run audit --db data/gpu_prices.sqlite --out ci/runtime/site 2>ci/reports/audit.log | tee ci/reports/audit.json
 
       - name: Deploy production to Cloudflare Pages
+        id: deploy
         if: success() && steps.audit.outcome == 'success'
         timeout-minutes: 5
         env:
@@ -102,13 +120,30 @@ jobs:
           fi
           npx --yes wrangler@4.45.0 pages deploy ci/runtime/site --project-name gpu-cloud-prices --branch main
 
+      - name: Record successful deployment
+        if: success() && steps.deploy.outcome == 'success'
+        run: python -m ci.refresh_policy deployed --db data/gpu_prices.sqlite --receipt ci/runtime/deploy-receipt.sqlite --fingerprint '${{ steps.refresh.outputs.fingerprint }}' --snapshot-at '${{ steps.refresh.outputs.snapshot_at }}'
+
+      - name: Persist successful deployment receipt
+        if: success() && steps.deploy.outcome == 'success'
+        uses: actions/cache/save@v4.2.3
+        with:
+          path: ci/runtime/deploy-receipt.sqlite
+          key: gpu-deploy-main-${{ github.run_id }}-${{ github.run_attempt }}
+
       # Successful observations remain valuable even if build/audit/deploy fails,
       # or the collect step times out after committing some provider batches.
       - name: Save price history even after a pipeline failure
         id: save
         if: ${{ !cancelled() && steps.restore.outcome == 'success' && steps.collect.outcome != 'skipped' && steps.collect.outcome != '' }}
         timeout-minutes: 3
-        run: bash ci/save_db.sh data/gpu_prices.sqlite ci/runtime/history-base
+        run: |
+          save_required=$(python -m ci.refresh_policy prepare-save --db data/gpu_prices.sqlite)
+          if [ "$save_required" = true ]; then
+            bash ci/save_db.sh data/gpu_prices.sqlite ci/runtime/history-base
+          else
+            echo 'Prices unchanged; this UTC day already has a saved history snapshot.'
+          fi
 
       - name: Upload build and audit reports
         if: ${{ always() }}

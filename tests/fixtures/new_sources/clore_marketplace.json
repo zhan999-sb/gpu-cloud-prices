@@ -1,0 +1,1313 @@
+{
+  "code": 0,
+  "servers": [
+    {
+      "id": 124318,
+      "rented": true,
+      "price": {
+        "on_demand": {
+          "CLORE-Blockchain": 3609.29,
+          "USD-Blockchain": 6
+        },
+        "spot": {
+          "CLORE-Blockchain": 1804.64,
+          "USD-Blockchain": 3
+        },
+        "original_usd": {
+          "CLORE-Blockchain": {
+            "on_demand": 6,
+            "spot": 3
+          }
+        },
+        "usd": {
+          "on_demand_btc": null,
+          "on_demand_clore": 6.000007696033202,
+          "on_demand_usd": 6,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": {
+        "total_gpus": 4,
+        "available_gpus": 0,
+        "free_indices": []
+      },
+      "specs": {
+        "gpu": "4x NVIDIA GeForce RTX 5060 Ti",
+        "gpuram": 8,
+        "cpus": "12/24",
+        "cpu": "AMD Ryzen Threadripper PRO 3945WX 12-Cores",
+        "ram": 64,
+        "net": {
+          "cc": "AU"
+        }
+      }
+    },
+    {
+      "id": 124316,
+      "rented": false,
+      "price": {
+        "on_demand": {
+          "bitcoin": 2.799e-05,
+          "CLORE-Blockchain": 1203.1,
+          "USD-Blockchain": 2
+        },
+        "spot": {
+          "bitcoin": 2.1e-05,
+          "CLORE-Blockchain": 902.32,
+          "USD-Blockchain": 1.5
+        },
+        "original_usd": {
+          "bitcoin": {
+            "on_demand": 2,
+            "spot": 1.5
+          },
+          "CLORE-Blockchain": {
+            "on_demand": 2,
+            "spot": 1.5
+          }
+        },
+        "usd": {
+          "on_demand_btc": 1.999714232951663,
+          "on_demand_clore": 2.000008106607545,
+          "on_demand_usd": 2,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": false,
+      "specs": {
+        "gpu": "1x Tesla P40",
+        "gpuram": 23,
+        "cpus": "4/4",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2698 v3 @ 2.30GHz",
+        "ram": 16,
+        "net": {
+          "cc": "PT"
+        }
+      }
+    },
+    {
+      "id": 124315,
+      "rented": false,
+      "price": {
+        "on_demand": {
+          "bitcoin": 2.663e-05,
+          "CLORE-Blockchain": 1143.48,
+          "USD-Blockchain": 1.9
+        },
+        "spot": {
+          "bitcoin": 2.663e-05,
+          "CLORE-Blockchain": 1143.48,
+          "USD-Blockchain": 1.9
+        },
+        "original_usd": {
+          "bitcoin": {
+            "on_demand": 1.9,
+            "spot": 1.9
+          },
+          "CLORE-Blockchain": {
+            "on_demand": 1.9,
+            "spot": 1.9
+          }
+        },
+        "usd": {
+          "on_demand_btc": 1.9025505546088883,
+          "on_demand_clore": 1.900897074011799,
+          "on_demand_usd": 1.9,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": {
+        "total_gpus": 1,
+        "available_gpus": 1,
+        "free_indices": [
+          0
+        ]
+      },
+      "specs": {
+        "gpu": "1x NVIDIA GeForce RTX 5060",
+        "gpuram": 8,
+        "cpus": "8/16",
+        "cpu": "Intel(R) Core(TM) i5-14400F",
+        "ram": 16,
+        "net": {
+          "cc": "RU"
+        }
+      }
+    },
+    {
+      "id": 124311,
+      "rented": true,
+      "price": {
+        "on_demand": {
+          "bitcoin": 0.00033333,
+          "CLORE-Blockchain": 12.4,
+          "USD-Blockchain": 12.4
+        },
+        "spot": {
+          "bitcoin": 0.00033333,
+          "CLORE-Blockchain": 12.4,
+          "USD-Blockchain": 12.4
+        },
+        "usd": {
+          "on_demand_btc": 23.814388898527252,
+          "on_demand_clore": 0.02061349889612963,
+          "on_demand_usd": 12.4,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": {
+        "total_gpus": 5,
+        "available_gpus": 0,
+        "free_indices": []
+      },
+      "specs": {
+        "gpu": "5x NVIDIA GeForce RTX 5060 Ti",
+        "gpuram": 8,
+        "cpus": "16/32",
+        "cpu": "AMD Ryzen 9 7950X 16-Core Processor             Unknown CPU @ 4.5GHz",
+        "ram": 64,
+        "net": {
+          "cc": "KR"
+        }
+      }
+    },
+    {
+      "id": 124310,
+      "rented": false,
+      "price": {
+        "on_demand": {
+          "bitcoin": 4.766e-05,
+          "CLORE-Blockchain": 2046.22,
+          "USD-Blockchain": 3.4
+        },
+        "spot": {
+          "bitcoin": 4.766e-05,
+          "CLORE-Blockchain": 2046.22,
+          "USD-Blockchain": 3.4
+        },
+        "original_usd": {
+          "bitcoin": {
+            "on_demand": 3.4,
+            "spot": 3.4
+          },
+          "CLORE-Blockchain": {
+            "on_demand": 3.4,
+            "spot": 3.4
+          }
+        },
+        "usd": {
+          "on_demand_btc": 3.4050153748651755,
+          "on_demand_clore": 3.401593041228901,
+          "on_demand_usd": 3.4,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": {
+        "total_gpus": 1,
+        "available_gpus": 1,
+        "free_indices": [
+          0
+        ]
+      },
+      "specs": {
+        "gpu": "1x NVIDIA RTX A5000",
+        "gpuram": 24,
+        "cpus": "64/128",
+        "cpu": "AMD EPYC 7551 32-Core Processor",
+        "ram": 32,
+        "net": {
+          "cc": "ES"
+        }
+      }
+    },
+    {
+      "id": 124308,
+      "rented": true,
+      "price": {
+        "on_demand": {
+          "CLORE-Blockchain": 9027.46,
+          "USD-Blockchain": 15
+        },
+        "spot": {
+          "CLORE-Blockchain": 10231.12,
+          "USD-Blockchain": 17
+        },
+        "original_usd": {
+          "CLORE-Blockchain": {
+            "on_demand": 15,
+            "spot": 17
+          }
+        },
+        "usd": {
+          "on_demand_btc": null,
+          "on_demand_clore": 15.007059414907609,
+          "on_demand_usd": 15,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": {
+        "total_gpus": 6,
+        "available_gpus": 0,
+        "free_indices": []
+      },
+      "specs": {
+        "gpu": "6x NVIDIA GeForce RTX 3080",
+        "gpuram": 10,
+        "cpus": "24/48",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2670 v3 @ 2.30GHz",
+        "ram": 128,
+        "net": {
+          "cc": "KR"
+        }
+      }
+    },
+    {
+      "id": 124306,
+      "rented": false,
+      "price": {
+        "on_demand": {
+          "bitcoin": 0.00033333,
+          "CLORE-Blockchain": 7462.7,
+          "USD-Blockchain": 12.4
+        },
+        "spot": {
+          "bitcoin": 0.00033333,
+          "CLORE-Blockchain": 7462.7,
+          "USD-Blockchain": 12.4
+        },
+        "original_usd": {
+          "CLORE-Blockchain": {
+            "on_demand": 12.4,
+            "spot": 12.4
+          }
+        },
+        "usd": {
+          "on_demand_btc": 23.814388898527252,
+          "on_demand_clore": 12.40583533968924,
+          "on_demand_usd": 12.4,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": {
+        "total_gpus": 5,
+        "available_gpus": 5,
+        "free_indices": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "specs": {
+        "gpu": "5x NVIDIA GeForce RTX 5060 Ti",
+        "gpuram": 8,
+        "cpus": "16/32",
+        "cpu": "AMD Ryzen 9 7950X 16-Core Processor             Unknown CPU @ 4.5GHz",
+        "ram": 64,
+        "net": {
+          "cc": "KR"
+        }
+      }
+    },
+    {
+      "id": 124305,
+      "rented": false,
+      "price": {
+        "on_demand": {
+          "bitcoin": 0.00034034,
+          "CLORE-Blockchain": 7462.7,
+          "USD-Blockchain": 12.4
+        },
+        "spot": {
+          "bitcoin": 0.00034034,
+          "CLORE-Blockchain": 7462.7,
+          "USD-Blockchain": 12.4
+        },
+        "original_usd": {
+          "bitcoin": {
+            "on_demand": 24.28,
+            "spot": 24.28
+          },
+          "CLORE-Blockchain": {
+            "on_demand": 12.4,
+            "spot": 12.4
+          }
+        },
+        "usd": {
+          "on_demand_btc": 24.31521050527935,
+          "on_demand_clore": 12.40583533968924,
+          "on_demand_usd": 12.4,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": {
+        "total_gpus": 5,
+        "available_gpus": 5,
+        "free_indices": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "specs": {
+        "gpu": "5x NVIDIA GeForce RTX 5060 Ti",
+        "gpuram": 8,
+        "cpus": "16/32",
+        "cpu": "AMD Ryzen 9 7950X 16-Core Processor             Unknown CPU @ 4.5GHz",
+        "ram": 64,
+        "net": {
+          "cc": "KR"
+        }
+      }
+    },
+    {
+      "id": 124302,
+      "rented": true,
+      "price": {
+        "on_demand": {
+          "bitcoin": 3.364e-05,
+          "CLORE-Blockchain": 1324.03,
+          "USD-Blockchain": 2.1
+        },
+        "spot": {
+          "bitcoin": 3.224e-05,
+          "CLORE-Blockchain": 1263.84,
+          "USD-Blockchain": 2
+        },
+        "original_usd": {
+          "bitcoin": {
+            "on_demand": 2.4,
+            "spot": 2.3
+          },
+          "CLORE-Blockchain": {
+            "on_demand": 2.2,
+            "spot": 2.1
+          }
+        },
+        "usd": {
+          "on_demand_btc": 2.403372161360984,
+          "on_demand_clore": 2.201039592213106,
+          "on_demand_usd": 2.1,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": {
+        "total_gpus": 6,
+        "available_gpus": 0,
+        "free_indices": []
+      },
+      "specs": {
+        "gpu": "6x NVIDIA GeForce GTX 1070",
+        "gpuram": 8,
+        "cpus": "2/2",
+        "cpu": "Intel(R) Celeron(R) CPU G1840 @ 2.80GHz",
+        "ram": 4,
+        "net": {
+          "cc": "RU"
+        }
+      }
+    },
+    {
+      "id": 124301,
+      "rented": true,
+      "price": {
+        "on_demand": {
+          "CLORE-Blockchain": 9027.46,
+          "USD-Blockchain": 15
+        },
+        "spot": {
+          "CLORE-Blockchain": 10231.12,
+          "USD-Blockchain": 17
+        },
+        "original_usd": {
+          "CLORE-Blockchain": {
+            "on_demand": 15,
+            "spot": 17
+          }
+        },
+        "usd": {
+          "on_demand_btc": null,
+          "on_demand_clore": 15.007059414907609,
+          "on_demand_usd": 15,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": {
+        "total_gpus": 6,
+        "available_gpus": 0,
+        "free_indices": []
+      },
+      "specs": {
+        "gpu": "6x NVIDIA GeForce RTX 3080",
+        "gpuram": 10,
+        "cpus": "44/88",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2699 v4 @ 2.20GHz  CPU @ 2.2GHz",
+        "ram": 96,
+        "net": {
+          "cc": "KR"
+        }
+      }
+    },
+    {
+      "id": 124299,
+      "rented": true,
+      "price": {
+        "on_demand": {
+          "bitcoin": 5.747e-05,
+          "CLORE-Blockchain": 2407.32,
+          "USD-Blockchain": 4.1
+        },
+        "spot": {
+          "bitcoin": 5.607e-05,
+          "CLORE-Blockchain": 2347.14,
+          "USD-Blockchain": 4
+        },
+        "original_usd": {
+          "bitcoin": {
+            "on_demand": 4.1,
+            "spot": 4
+          },
+          "CLORE-Blockchain": {
+            "on_demand": 4,
+            "spot": 3.9
+          }
+        },
+        "usd": {
+          "on_demand_btc": 4.105879848793571,
+          "on_demand_clore": 4.001878077631514,
+          "on_demand_usd": 4.1,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": false,
+      "specs": {
+        "gpu": "1x NVIDIA GeForce RTX 5070 Ti",
+        "gpuram": 16,
+        "cpus": "8/16",
+        "cpu": "12th Gen Intel(R) Core(TM) i5-12600KF To Be Filled By O.E.M. CPU @ 3.6",
+        "ram": 64,
+        "net": {
+          "cc": "RU"
+        }
+      }
+    },
+    {
+      "id": 124298,
+      "rented": true,
+      "price": {
+        "on_demand": {
+          "bitcoin": 1.822e-05,
+          "CLORE-Blockchain": 782.38,
+          "USD-Blockchain": 1.3
+        },
+        "spot": {
+          "bitcoin": 7.023e-05,
+          "CLORE-Blockchain": 3009.15,
+          "USD-Blockchain": 5
+        },
+        "original_usd": {
+          "bitcoin": {
+            "on_demand": 1.3,
+            "spot": 5.01
+          },
+          "CLORE-Blockchain": {
+            "on_demand": 1.3,
+            "spot": 5
+          }
+        },
+        "usd": {
+          "on_demand_btc": 1.3017075142686423,
+          "on_demand_clore": 1.3006120376091854,
+          "on_demand_usd": 1.3,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": {
+        "total_gpus": 1,
+        "available_gpus": 0,
+        "free_indices": []
+      },
+      "specs": {
+        "gpu": "1x Tesla V100SXM216GB",
+        "gpuram": 16,
+        "cpus": "2/2",
+        "cpu": "Intel(R) Pentium(R) CPU G3420 @ 3.20GHz Fill By OEM CPU @ 3.2GHz",
+        "ram": 16,
+        "net": {
+          "cc": "RU"
+        }
+      }
+    },
+    {
+      "id": 124297,
+      "rented": true,
+      "price": {
+        "on_demand": {
+          "bitcoin": 8.41e-06,
+          "CLORE-Blockchain": 361.1,
+          "USD-Blockchain": 0.6
+        },
+        "spot": {
+          "bitcoin": 7.01e-06,
+          "CLORE-Blockchain": 300.92,
+          "USD-Blockchain": 0.5
+        },
+        "original_usd": {
+          "bitcoin": {
+            "on_demand": 0.6,
+            "spot": 0.5
+          },
+          "CLORE-Blockchain": {
+            "on_demand": 0.6,
+            "spot": 0.5
+          }
+        },
+        "usd": {
+          "on_demand_btc": 0.600843040340246,
+          "on_demand_clore": 0.6002850364026137,
+          "on_demand_usd": 0.6,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": {
+        "total_gpus": 1,
+        "available_gpus": 0,
+        "free_indices": []
+      },
+      "specs": {
+        "gpu": "1x NVIDIA GeForce GTX 1660 SUPER",
+        "gpuram": 6,
+        "cpus": "4/4",
+        "cpu": "Intel(R) Core(TM) i5-4590S CPU @ 3.00GHz",
+        "ram": 16,
+        "net": {
+          "cc": "RU"
+        }
+      }
+    },
+    {
+      "id": 124296,
+      "rented": true,
+      "price": {
+        "on_demand": {
+          "CLORE-Blockchain": 1805.49,
+          "USD-Blockchain": 3.5
+        },
+        "spot": {
+          "CLORE-Blockchain": 1805.49,
+          "USD-Blockchain": 3.5
+        },
+        "original_usd": {
+          "CLORE-Blockchain": {
+            "on_demand": 3,
+            "spot": 3
+          }
+        },
+        "usd": {
+          "on_demand_btc": null,
+          "on_demand_clore": 3.001408558223636,
+          "on_demand_usd": 3.5,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": false,
+      "specs": {
+        "gpu": "3x NVIDIA GeForce RTX 3060 Ti",
+        "gpuram": 8,
+        "cpus": "2/4",
+        "cpu": "Intel(R) Core(TM) i3-3240T CPU @ 2.90GHz",
+        "ram": 9,
+        "net": {
+          "cc": "IN"
+        }
+      }
+    },
+    {
+      "id": 124289,
+      "rented": false,
+      "price": {
+        "on_demand": {
+          "USD-Blockchain": 2
+        },
+        "spot": {
+          "USD-Blockchain": 2
+        },
+        "original_usd": {},
+        "usd": {
+          "on_demand_btc": null,
+          "on_demand_clore": null,
+          "on_demand_usd": 2,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": {
+        "total_gpus": 1,
+        "available_gpus": 1,
+        "free_indices": [
+          0
+        ]
+      },
+      "specs": {
+        "gpu": "1x NVIDIA GeForce RTX 5060 Ti",
+        "gpuram": 16,
+        "cpus": "12/24",
+        "cpu": "AMD Ryzen 9 5900X 12-Core Processor",
+        "ram": 16,
+        "net": {
+          "cc": "US"
+        }
+      }
+    },
+    {
+      "id": 124288,
+      "rented": true,
+      "price": {
+        "on_demand": {
+          "USD-Blockchain": 2.65
+        },
+        "spot": {
+          "USD-Blockchain": 2.65
+        },
+        "original_usd": {},
+        "usd": {
+          "on_demand_btc": null,
+          "on_demand_clore": null,
+          "on_demand_usd": 2.65,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": {
+        "total_gpus": 1,
+        "available_gpus": 0,
+        "free_indices": []
+      },
+      "specs": {
+        "gpu": "1x NVIDIA GeForce RTX 5070",
+        "gpuram": 12,
+        "cpus": "12/24",
+        "cpu": "AMD Ryzen 9 5900X 12-Core Processor",
+        "ram": 32,
+        "net": {
+          "cc": "US"
+        }
+      }
+    },
+    {
+      "id": 124287,
+      "rented": true,
+      "price": {
+        "on_demand": {
+          "USD-Blockchain": 2.65
+        },
+        "spot": {
+          "USD-Blockchain": 2.65
+        },
+        "original_usd": {},
+        "usd": {
+          "on_demand_btc": null,
+          "on_demand_clore": null,
+          "on_demand_usd": 2.65,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": {
+        "total_gpus": 1,
+        "available_gpus": 0,
+        "free_indices": []
+      },
+      "specs": {
+        "gpu": "1x NVIDIA GeForce RTX 5070",
+        "gpuram": 12,
+        "cpus": "12/24",
+        "cpu": "AMD Ryzen 9 5900X 12-Core Processor",
+        "ram": 32,
+        "net": {
+          "cc": "US"
+        }
+      }
+    },
+    {
+      "id": 124284,
+      "rented": true,
+      "price": {
+        "on_demand": {
+          "bitcoin": 2.944e-05,
+          "CLORE-Blockchain": 1263.84,
+          "USD-Blockchain": 2.1
+        },
+        "spot": {
+          "bitcoin": 2.944e-05,
+          "CLORE-Blockchain": 1263.84,
+          "USD-Blockchain": 2.1
+        },
+        "original_usd": {
+          "bitcoin": {
+            "on_demand": 2.1,
+            "spot": 2.1
+          },
+          "CLORE-Blockchain": {
+            "on_demand": 2.1,
+            "spot": 2.1
+          }
+        },
+        "usd": {
+          "on_demand_btc": 2.1033078605965327,
+          "on_demand_clore": 2.100981003619715,
+          "on_demand_usd": 2.1,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": {
+        "total_gpus": 1,
+        "available_gpus": 0,
+        "free_indices": []
+      },
+      "specs": {
+        "gpu": "1x NVIDIA GeForce RTX 3080",
+        "gpuram": 10,
+        "cpus": "8/16",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2630 v3 @ 2.40GHz",
+        "ram": 32,
+        "net": {
+          "cc": "CA"
+        }
+      }
+    },
+    {
+      "id": 124282,
+      "rented": true,
+      "price": {
+        "on_demand": {
+          "bitcoin": 2.944e-05,
+          "CLORE-Blockchain": 1263.84,
+          "USD-Blockchain": 2.1
+        },
+        "spot": {
+          "bitcoin": 2.944e-05,
+          "CLORE-Blockchain": 1263.84,
+          "USD-Blockchain": 2.1
+        },
+        "original_usd": {
+          "bitcoin": {
+            "on_demand": 2.1,
+            "spot": 2.1
+          },
+          "CLORE-Blockchain": {
+            "on_demand": 2.1,
+            "spot": 2.1
+          }
+        },
+        "usd": {
+          "on_demand_btc": 2.1033078605965327,
+          "on_demand_clore": 2.100981003619715,
+          "on_demand_usd": 2.1,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": false,
+      "specs": {
+        "gpu": "1x NVIDIA GeForce RTX 3080",
+        "gpuram": 10,
+        "cpus": "4/8",
+        "cpu": "Intel(R) Xeon(R) CPU E5-1620 v4 @ 3.50GHz",
+        "ram": 32,
+        "net": {
+          "cc": "CA"
+        }
+      }
+    },
+    {
+      "id": 124280,
+      "rented": false,
+      "price": {
+        "on_demand": {
+          "bitcoin": 0.00011214,
+          "CLORE-Blockchain": 4814.64,
+          "USD-Blockchain": 8
+        },
+        "spot": {
+          "bitcoin": 0.00011214,
+          "CLORE-Blockchain": 4814.64,
+          "USD-Blockchain": 8
+        },
+        "original_usd": {
+          "bitcoin": {
+            "on_demand": 8,
+            "spot": 8
+          },
+          "CLORE-Blockchain": {
+            "on_demand": 8,
+            "spot": 8
+          }
+        },
+        "usd": {
+          "on_demand_btc": 8.011716830410842,
+          "on_demand_clore": 8.003756155263028,
+          "on_demand_usd": 8,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": {
+        "total_gpus": 6,
+        "available_gpus": 6,
+        "free_indices": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "specs": {
+        "gpu": "6x NVIDIA GeForce RTX 5060",
+        "gpuram": 8,
+        "cpus": "2/4",
+        "cpu": "Intel(R) Pentium(R) Gold G5420 CPU @ 3.80GHz",
+        "ram": 8,
+        "net": {
+          "cc": "BR"
+        }
+      }
+    },
+    {
+      "id": 122309,
+      "rented": false,
+      "price": {
+        "on_demand": {
+          "bitcoin": 0.00063078,
+          "CLORE-Blockchain": 54164.73,
+          "USD-Blockchain": 45
+        },
+        "spot": {
+          "bitcoin": 0.00039248,
+          "CLORE-Blockchain": 42128.12,
+          "USD-Blockchain": 28
+        },
+        "original_usd": {
+          "bitcoin": {
+            "on_demand": 45,
+            "spot": 28
+          },
+          "CLORE-Blockchain": {
+            "on_demand": 90,
+            "spot": 70
+          }
+        },
+        "usd": {
+          "on_demand_btc": 45.06537134195248,
+          "on_demand_clore": 90.04230661807738,
+          "on_demand_usd": 45,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": false,
+      "specs": {
+        "gpu": "2x NVIDIA H100 NVL",
+        "gpuram": 94,
+        "cpus": "72/72",
+        "cpu": "AMD EPYC 9V84 96-Core Processor",
+        "ram": 512,
+        "net": {
+          "cc": "US"
+        }
+      }
+    },
+    {
+      "id": 122141,
+      "rented": true,
+      "price": {
+        "on_demand": {
+          "CLORE-Blockchain": 7823.79,
+          "USD-Blockchain": 11
+        },
+        "spot": {
+          "CLORE-Blockchain": 6620.13,
+          "USD-Blockchain": 9
+        },
+        "original_usd": {
+          "CLORE-Blockchain": {
+            "on_demand": 13,
+            "spot": 11
+          }
+        },
+        "usd": {
+          "on_demand_btc": null,
+          "on_demand_clore": 13.00610375230242,
+          "on_demand_usd": 11,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": false,
+      "specs": {
+        "gpu": "1x NVIDIA A100 80GB PCIe",
+        "gpuram": 80,
+        "cpus": "64/128",
+        "cpu": "Intel(R) Xeon(R) Gold 6338 CPU @ 2.00GHz",
+        "ram": 768,
+        "net": {
+          "cc": "RU"
+        }
+      }
+    },
+    {
+      "id": 121464,
+      "rented": true,
+      "price": {
+        "on_demand": {
+          "CLORE-Blockchain": 7823.79,
+          "USD-Blockchain": 12
+        },
+        "spot": {
+          "CLORE-Blockchain": 6620.13,
+          "USD-Blockchain": 10
+        },
+        "original_usd": {
+          "CLORE-Blockchain": {
+            "on_demand": 13,
+            "spot": 11
+          }
+        },
+        "usd": {
+          "on_demand_btc": null,
+          "on_demand_clore": 13.00610375230242,
+          "on_demand_usd": 12,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": {
+        "total_gpus": 1,
+        "available_gpus": 0,
+        "free_indices": []
+      },
+      "specs": {
+        "gpu": "1x NVIDIA H100",
+        "gpuram": 80,
+        "cpus": "20/40",
+        "cpu": "Intel(R) Xeon(R) Gold 6230 CPU @ 2.10GHz",
+        "ram": 384,
+        "net": {
+          "cc": "RU"
+        }
+      }
+    },
+    {
+      "id": 120929,
+      "rented": false,
+      "price": {
+        "on_demand": {
+          "bitcoin": 0.00075693,
+          "CLORE-Blockchain": 22869.55,
+          "USD-Blockchain": 38
+        },
+        "spot": {
+          "bitcoin": 0.00061676,
+          "CLORE-Blockchain": 16851.25,
+          "USD-Blockchain": 28
+        },
+        "original_usd": {
+          "bitcoin": {
+            "on_demand": 54,
+            "spot": 44
+          },
+          "CLORE-Blockchain": {
+            "on_demand": 38,
+            "spot": 28
+          }
+        },
+        "usd": {
+          "on_demand_btc": 54.07801694705616,
+          "on_demand_clore": 38.017858361288816,
+          "on_demand_usd": 38,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": {
+        "total_gpus": 2,
+        "available_gpus": 2,
+        "free_indices": [
+          0,
+          1
+        ]
+      },
+      "specs": {
+        "gpu": "2x NVIDIA A100SXM440GB",
+        "gpuram": 40,
+        "cpus": "12/24",
+        "cpu": "CPU @ 2.0GHz",
+        "ram": 167,
+        "net": {
+          "cc": "US"
+        }
+      }
+    },
+    {
+      "id": 120846,
+      "rented": false,
+      "price": {
+        "on_demand": {
+          "bitcoin": 0.00075693,
+          "CLORE-Blockchain": 22869.55,
+          "USD-Blockchain": 38
+        },
+        "spot": {
+          "bitcoin": 0.00061676,
+          "CLORE-Blockchain": 16851.25,
+          "USD-Blockchain": 28
+        },
+        "original_usd": {
+          "bitcoin": {
+            "on_demand": 54,
+            "spot": 44
+          },
+          "CLORE-Blockchain": {
+            "on_demand": 38,
+            "spot": 28
+          }
+        },
+        "usd": {
+          "on_demand_btc": 54.07801694705616,
+          "on_demand_clore": 38.017858361288816,
+          "on_demand_usd": 38,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": {
+        "total_gpus": 2,
+        "available_gpus": 2,
+        "free_indices": [
+          0,
+          1
+        ]
+      },
+      "specs": {
+        "gpu": "2x NVIDIA A100SXM440GB",
+        "gpuram": 40,
+        "cpus": "12/24",
+        "cpu": "CPU @ 2.0GHz",
+        "ram": 167,
+        "net": {
+          "cc": "US"
+        }
+      }
+    },
+    {
+      "id": 119526,
+      "rented": false,
+      "price": {
+        "on_demand": {
+          "CLORE-Blockchain": 14443.93,
+          "USD-Blockchain": 24
+        },
+        "spot": {
+          "CLORE-Blockchain": 10832.95,
+          "USD-Blockchain": 18
+        },
+        "original_usd": {
+          "CLORE-Blockchain": {
+            "on_demand": 24,
+            "spot": 18
+          }
+        },
+        "usd": {
+          "on_demand_btc": null,
+          "on_demand_clore": 24.011285089578518,
+          "on_demand_usd": 24,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": {
+        "total_gpus": 1,
+        "available_gpus": 1,
+        "free_indices": [
+          0
+        ]
+      },
+      "specs": {
+        "gpu": "1x NVIDIA A100SXM440GB",
+        "gpuram": 40,
+        "cpus": "6/12",
+        "cpu": "CPU @ 2.0GHz",
+        "ram": 83,
+        "net": {
+          "cc": "US"
+        }
+      }
+    },
+    {
+      "id": 119369,
+      "rented": false,
+      "price": {
+        "on_demand": {
+          "bitcoin": 0.00028315,
+          "CLORE-Blockchain": 8419.61,
+          "USD-Blockchain": 12.99
+        },
+        "spot": {
+          "bitcoin": 0.00025483,
+          "CLORE-Blockchain": 7215.95,
+          "USD-Blockchain": 10.99
+        },
+        "original_usd": {
+          "bitcoin": {
+            "on_demand": 20.2,
+            "spot": 18.18
+          },
+          "CLORE-Blockchain": {
+            "on_demand": 13.99,
+            "spot": 11.99
+          }
+        },
+        "usd": {
+          "on_demand_btc": 20.22933494320341,
+          "on_demand_clore": 13.99658237426145,
+          "on_demand_usd": 12.99,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": false,
+      "specs": {
+        "gpu": "2x NVIDIA GeForce RTX 4090",
+        "gpuram": 24,
+        "cpus": "16/32",
+        "cpu": "AMD Ryzen 9 7950X3D 16-Core Processor",
+        "ram": 64,
+        "net": {
+          "cc": "UA"
+        }
+      }
+    },
+    {
+      "id": 115384,
+      "rented": false,
+      "price": {
+        "on_demand": {
+          "bitcoin": 0.00063078,
+          "CLORE-Blockchain": 60183.04,
+          "USD-Blockchain": 45
+        },
+        "spot": {
+          "bitcoin": 0.00042052,
+          "CLORE-Blockchain": 48146.43,
+          "USD-Blockchain": 30
+        },
+        "original_usd": {
+          "bitcoin": {
+            "on_demand": 45,
+            "spot": 30
+          },
+          "CLORE-Blockchain": {
+            "on_demand": 100,
+            "spot": 80
+          }
+        },
+        "usd": {
+          "on_demand_btc": 45.06537134195248,
+          "on_demand_clore": 100.04701843594559,
+          "on_demand_usd": 45,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": false,
+      "specs": {
+        "gpu": "2x NVIDIA H100 NVL",
+        "gpuram": 94,
+        "cpus": "80/80",
+        "cpu": "AMD EPYC 9V84 96-Core Processor",
+        "ram": 630,
+        "net": {
+          "cc": "US"
+        }
+      }
+    },
+    {
+      "id": 115374,
+      "rented": true,
+      "price": {
+        "on_demand": {
+          "bitcoin": 0.00063078,
+          "CLORE-Blockchain": 54164.73,
+          "USD-Blockchain": 45
+        },
+        "spot": {
+          "bitcoin": 0.00039248,
+          "CLORE-Blockchain": 42128.12,
+          "USD-Blockchain": 28
+        },
+        "original_usd": {
+          "bitcoin": {
+            "on_demand": 45,
+            "spot": 28
+          },
+          "CLORE-Blockchain": {
+            "on_demand": 90,
+            "spot": 70
+          }
+        },
+        "usd": {
+          "on_demand_btc": 45.06537134195248,
+          "on_demand_clore": 90.04230661807738,
+          "on_demand_usd": 45,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": false,
+      "specs": {
+        "gpu": "2x NVIDIA H100 NVL",
+        "gpuram": 94,
+        "cpus": "80/80",
+        "cpu": "AMD EPYC 9V84 96-Core Processor",
+        "ram": 630,
+        "net": {
+          "cc": "US"
+        }
+      }
+    },
+    {
+      "id": 113799,
+      "rented": false,
+      "price": {
+        "on_demand": {
+          "bitcoin": 0.00026212,
+          "CLORE-Blockchain": 11254.23,
+          "USD-Blockchain": 18.7
+        },
+        "spot": {
+          "bitcoin": 0.00026212,
+          "CLORE-Blockchain": 11254.23,
+          "USD-Blockchain": 18.7
+        },
+        "original_usd": {
+          "bitcoin": {
+            "on_demand": 18.7,
+            "spot": 18.7
+          },
+          "CLORE-Blockchain": {
+            "on_demand": 18.7,
+            "spot": 18.7
+          }
+        },
+        "usd": {
+          "on_demand_btc": 18.726870122947123,
+          "on_demand_clore": 18.708794974337817,
+          "on_demand_usd": 18.7,
+          "spot": 0
+        }
+      },
+      "partial_gpu_rental": false,
+      "specs": {
+        "gpu": "3x NVIDIA GeForce RTX 4090",
+        "gpuram": 24,
+        "cpus": "16/32",
+        "cpu": "AMD Ryzen 9 9950X 16-Core Processor",
+        "ram": 64,
+        "net": {
+          "cc": "MT"
+        }
+      }
+    }
+  ]
+}

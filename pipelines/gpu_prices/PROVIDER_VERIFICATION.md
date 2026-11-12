@@ -89,3 +89,22 @@ Minima below obey the whole-GPU, current-effective, standard-region, exact-price
 - Real browser interaction/visual QA not completed: browser access host unavailable and native Chrome access denied by automatic approval. Static HTML, numeric audit and tests passed.
 
 Machine-readable evidence: `runtime/PHASE1_VERIFICATION.json`; complete command outputs: `runtime/collection_phase1.json`, `runtime/collection_retry_p1.json`, `runtime/build_verified.json`, `runtime/pytest_delivery_1.txt`, `runtime/pytest_delivery_2.txt`.
+
+## Redesign verification, 2026-11-12
+
+The preceding phase-1 minima and browser limitation are historical evidence.
+The redesign explicitly admits unspecified regions and unknown tax bases into
+whole-GPU USD headline minima, with visible labels. Edge/restricted regions,
+fractions, included tax, component-only and starting prices remain excluded.
+The source database has not been recollected or rewritten. Unconverted EUR
+still has no fabricated USD value and stays outside USD comparisons.
+
+The current preview uses the existing database and the configured public origin
+`https://gpu-cloud-prices.pages.dev`. Both its built-in gate and the separate
+audit command pass. Browser verification now covers desktop 1280x800, mobile
+390x844, light/dark appearance, all eight mobile language routes, combined
+filters, reset, both price sorts, and a JavaScript-disabled context. All 126
+generated index offer cards remain visible without JavaScript and the page does
+not scroll horizontally. Current evidence is `runtime/redesign_build.json`,
+`runtime/redesign_audit.json`, `runtime/ui/verification.json`, screenshots in
+`runtime/ui/`, and the two `runtime/redesign_verified_*.log` test records.

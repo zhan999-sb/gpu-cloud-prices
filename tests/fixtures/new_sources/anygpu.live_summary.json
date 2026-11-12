@@ -1,0 +1,151 @@
+{
+  "source_url": "https://www.anygpu.cn/",
+  "fetched_at": "2026-11-12T15:28:14.552570+00:00",
+  "succeeded": true,
+  "record_count": 2,
+  "price_types": {
+    "on_demand": 2
+  },
+  "unknown_gpu_mapping_count": 2,
+  "cheapest": {
+    "RTX 4090": {
+      "on_demand": {
+        "product": "GPU云主机",
+        "sku": "RTX 4090 | 24GB显存 64GB内存 50GB+200GB SSD 8核CPU",
+        "gpu_model_raw": "RTX 4090",
+        "gpu_model": "RTX 4090",
+        "gpu_count": null,
+        "gpu_fraction": null,
+        "vram_raw": "24GB",
+        "vcpu": null,
+        "ram_raw": "64GB",
+        "price_per_hour": 2.24,
+        "currency": "CNY",
+        "price_type": "on_demand",
+        "price_scope": "instance",
+        "billing_unit": "instance-hour",
+        "minimum_billing_seconds": null,
+        "effective_from": null,
+        "effective_to": null,
+        "region": null,
+        "availability_observed_at": null,
+        "provider": "anygpu",
+        "source_url": "https://www.anygpu.cn/",
+        "tier": "C",
+        "export_allowed": false,
+        "is_from_price": false,
+        "tax_basis": "unknown",
+        "availability": "unknown",
+        "observed_at": "2026-11-12T15:28:14.552570+00:00",
+        "gpu_model_normalized": "NVIDIA RTX 4090 24GB",
+        "flags": [
+          "unmapped_gpu_model"
+        ],
+        "checked_at": "2026-11-12T15:28:14.552570+00:00",
+        "collected_at": "2026-11-12T15:28:14.552570+00:00",
+        "cpu_raw": "8核CPU",
+        "disk_raw": "50GB+200GB SSD",
+        "price_per_gpu_hour": null,
+        "notes": [
+          "Normal hourly package price; CPU core label retained verbatim.",
+          "Member hourly price: CNY 1.97; membership required."
+        ],
+        "member_price_per_hour": 1.97
+      }
+    },
+    "A100": {},
+    "H100": {}
+  },
+  "examples": [
+    {
+      "product": "GPU云主机",
+      "sku": "RTX 4090 | 24GB显存 64GB内存 50GB+200GB SSD 8核CPU",
+      "gpu_model_raw": "RTX 4090",
+      "gpu_model": "RTX 4090",
+      "gpu_count": null,
+      "gpu_fraction": null,
+      "vram_raw": "24GB",
+      "vcpu": null,
+      "ram_raw": "64GB",
+      "price_per_hour": 2.24,
+      "currency": "CNY",
+      "price_type": "on_demand",
+      "price_scope": "instance",
+      "billing_unit": "instance-hour",
+      "minimum_billing_seconds": null,
+      "effective_from": null,
+      "effective_to": null,
+      "region": null,
+      "availability_observed_at": null,
+      "provider": "anygpu",
+      "source_url": "https://www.anygpu.cn/",
+      "tier": "C",
+      "export_allowed": false,
+      "is_from_price": false,
+      "tax_basis": "unknown",
+      "availability": "unknown",
+      "observed_at": "2026-11-12T15:28:14.552570+00:00",
+      "gpu_model_normalized": "NVIDIA RTX 4090 24GB",
+      "flags": [
+        "unmapped_gpu_model"
+      ],
+      "checked_at": "2026-11-12T15:28:14.552570+00:00",
+      "collected_at": "2026-11-12T15:28:14.552570+00:00",
+      "cpu_raw": "8核CPU",
+      "disk_raw": "50GB+200GB SSD",
+      "price_per_gpu_hour": null,
+      "notes": [
+        "Normal hourly package price; CPU core label retained verbatim.",
+        "Member hourly price: CNY 1.97; membership required."
+      ],
+      "member_price_per_hour": 1.97
+    },
+    {
+      "product": "GPU云主机",
+      "sku": "RTX 3090 | 24GB显存 48GB内存 50GB+200GB SSD 8核CPU",
+      "gpu_model_raw": "RTX 3090",
+      "gpu_model": "RTX 3090",
+      "gpu_count": null,
+      "gpu_fraction": null,
+      "vram_raw": "24GB",
+      "vcpu": null,
+      "ram_raw": "48GB",
+      "price_per_hour": 1.55,
+      "currency": "CNY",
+      "price_type": "on_demand",
+      "price_scope": "instance",
+      "billing_unit": "instance-hour",
+      "minimum_billing_seconds": null,
+      "effective_from": null,
+      "effective_to": null,
+      "region": null,
+      "availability_observed_at": null,
+      "provider": "anygpu",
+      "source_url": "https://www.anygpu.cn/",
+      "tier": "C",
+      "export_allowed": false,
+      "is_from_price": false,
+      "tax_basis": "unknown",
+      "availability": "unknown",
+      "observed_at": "2026-11-12T15:28:14.552570+00:00",
+      "gpu_model_normalized": "NVIDIA RTX 3090 24GB",
+      "flags": [
+        "unmapped_gpu_model"
+      ],
+      "checked_at": "2026-11-12T15:28:14.552570+00:00",
+      "collected_at": "2026-11-12T15:28:14.552570+00:00",
+      "cpu_raw": "8核CPU",
+      "disk_raw": "50GB+200GB SSD",
+      "price_per_gpu_hour": null,
+      "notes": [
+        "Normal hourly package price; CPU core label retained verbatim.",
+        "Member hourly price: CNY 1.36; membership required."
+      ],
+      "member_price_per_hour": 1.36
+    }
+  ],
+  "limitations": [
+    "RTX 5090 normal hourly price is literally ¥2.72.0 and was skipped.",
+    "GPU allocation count is not explicit, so per-GPU-hour prices are null."
+  ]
+}

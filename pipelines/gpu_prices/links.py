@@ -16,8 +16,10 @@ from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from .catalog import AZURE_SKUS
+from .providers.registry import PROVIDERS
 
 PROVIDER_LINKS = {
+    "clore": {"name": "Clore.ai", "url": "https://clore.ai/marketplace", "ref_param": None},
     "azure": {"name": "Azure", "url": "https://azure.microsoft.com/en-us/pricing/details/virtual-machines/linux/", "ref_param": None},
     "vast": {"name": "Vast.ai", "url": "https://vast.ai/pricing", "ref_param": "ref_id"},
     "together": {"name": "Together", "url": "https://www.together.ai/pricing", "ref_param": None},
@@ -31,6 +33,14 @@ PROVIDER_ONLY = (
     {"provider": "together", "name": "Together", "pricing_url": "https://www.together.ai/pricing",
      "gpu_models": (), "note": "link_only_note"},
 )
+
+# Only the exact reviewed page destinations, with no invented referral contract.
+for _key, _entry in PROVIDERS.items():
+    if _entry['tier'] in {'B', 'C'}:
+        PROVIDER_LINKS[_key] = {'name': _entry['name'], 'url': _entry['source'], 'ref_param': None}
+PROVIDER_ONLY += tuple({'provider': key, 'name': entry['name'], 'pricing_url': entry['source'],
+                       'gpu_models': (), 'note': entry['note']}
+                      for key, entry in PROVIDERS.items() if entry.get('link_only'))
 
 
 def link_for(provider, sku, region, price_type, *, model=None):
@@ -59,6 +69,7 @@ def link_for(provider, sku, region, price_type, *, model=None):
         if provider == "vast":
             parts = urlsplit("https://cloud.vast.ai/")
         params[entry["ref_param"]] = ref
-    params.update(utm_source="gpu-cloud-prices", utm_medium="referral", utm_campaign=campaign)
+    if provider not in {'clore', 'anygpu', 'ai_galaxy'}:
+        params.update(utm_source="gpu-cloud-prices", utm_medium="referral", utm_campaign=campaign)
     return {"url": urlunsplit(parts._replace(query=urlencode(params))),
-            "label": "view_azure" if provider == "azure" else "check_live", "is_affiliate": affiliate}
+            "label": "view_provider", "provider_name": entry["name"], "is_affiliate": affiliate}

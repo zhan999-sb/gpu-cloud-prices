@@ -1,6 +1,6 @@
 """Independent build gate. Reads SQLite, never renderer/store/statistics helpers.
 
-Only the reviewed region DATA table and translation catalogs are shared. Prices
+Reviewed region/naming policies and translation catalogs are shared. Prices
 are divided again from VM dollars and GPU count; a hand-written median is used.
 HTML values carry semantic pointers so every table, card and SVG value can be
 checked against recomputed facts. SEO/FAQ prose and graph geometry get separate
@@ -15,6 +15,7 @@ from pathlib import Path
 import random
 import re
 import sqlite3
+import zlib
 from urllib.parse import urlencode
 
 from .i18n import LANGUAGES, load_catalogs
@@ -22,10 +23,11 @@ from .regions import REGIONS
 from .catalog import AZURE_SKUS
 from .links import PROVIDER_ONLY
 from .providers.registry import PROVIDERS
+from .models import canonical_model, category, popular_rank, POPULAR, CATEGORIES, model_family
 from fractions import Fraction
 
 SOURCE = "https://learn.microsoft.com/en-us/rest/api/cost-management/retail-prices/azure-retail-prices"
-FIELDS = "provider sku gpu_model gpu_count vcpu ram_gb region price_type currency price_per_hour price_per_gpu_hour source_url collected_at effective_start_date price_scope gpu_fraction gpu_model_raw tax_basis is_from_price billing_unit minimum_billing_seconds effective_from effective_to availability availability_observed_at tier export_allowed original_currency original_price fx_rate fx_date fx_source product zone cpu_raw ram_raw vram_raw".split()
+FIELDS = "provider sku gpu_model gpu_count vcpu ram_gb region price_type currency price_per_hour price_per_gpu_hour source_url collected_at effective_start_date price_scope gpu_fraction gpu_model_raw tax_basis is_from_price billing_unit minimum_billing_seconds effective_from effective_to availability availability_observed_at tier export_allowed original_currency original_price fx_rate fx_date fx_source product zone cpu_raw ram_raw vram_raw price_conditions price_per_day source_billing_unit price_basis fx_usd_per_eur fx_original_per_eur".split()
 
 
 class AuditError(ValueError):
@@ -45,14 +47,27 @@ def _classification(name):
 
 
 def _eligible(row):
-    return (row["currency"] == "USD" and row["gpu_count"] >= 1 and float(row['gpu_count']).is_integer()
+    return (row["currency"] == "USD" and row["gpu_count"] is not None and row["gpu_count"] >= 1 and float(row['gpu_count']).is_integer()
             and row.get('gpu_fraction',1) == 1 and not row.get('is_from_price',False)
             and row.get('tax_basis','unknown') != 'included' and row.get('price_scope','instance') in {'instance','per_gpu'}
-            and _classification(row["region"]) == "standard" and row["price_type"] in ("on_demand", "spot"))
+            and _classification(row["region"]) in {"standard", "unknown_region"} and row["price_type"] in ("on_demand", "spot"))
 
 
 def _rate(row):
-    return row['price_per_hour'] / row['gpu_count'] if row.get('price_scope','instance') == 'instance' else row['price_per_hour']
+    if row.get('price_scope','instance') != 'instance':
+        return row['price_per_hour']
+    allocation = row['gpu_count']
+    if allocation is None and row.get('gpu_fraction') is not None and row['gpu_fraction'] < 1:
+        allocation = row['gpu_fraction']
+    return row['price_per_hour'] / allocation if allocation else None
+
+
+def _allocation(row):
+    count, fraction = row['gpu_count'], row['gpu_fraction']
+    if (count is not None and (count < 1 or not float(count).is_integer())
+            or fraction is not None and fraction < 1):
+        return 'fractional'
+    return 'whole' if count is not None and fraction == 1 else 'unknown'
 
 
 def _current(row, stamp):
@@ -76,12 +91,12 @@ def _statistics(rows):
     cheapest = {kind: values["min"] if values else None for kind, values in distributions.items()}
     regions = []
     for name in sorted({r["region"] for r in rows}, key=lambda r: r or ""):
-        for allocation in ("whole", "fractional"):
-            local = [r for r in rows if r["region"] == name and (r["gpu_count"] >= 1 and float(r["gpu_count"]).is_integer() and r["gpu_fraction"] == 1) == (allocation == "whole")]
+        for allocation in ("whole", "fractional", "unknown"):
+            local = [r for r in rows if r["region"] == name and _allocation(r) == allocation]
             if local:
                 entry = {"region": name, "classification": _classification(name), "allocation": allocation, "offers": len(local)}
                 for kind in ("on_demand", "spot"):
-                    values = [_rate(r) for r in local if r["price_type"] == kind and r["currency"] == "USD" and r.get("tax_basis") != "included" and not r.get("is_from_price") and r.get("price_scope") != "gpu_component"]
+                    values = [_rate(r) for r in local if _rate(r) is not None and r["price_type"] == kind and r["currency"] == "USD" and r.get("tax_basis") != "included" and not r.get("is_from_price") and r.get("price_scope") != "gpu_component"]
                     entry[kind + "_min"] = min(values) if values else None
                 regions.append(entry)
     demand, spot = cheapest["on_demand"], cheapest["spot"]
@@ -94,7 +109,16 @@ def _statistics(rows):
 
 def _snapshot(connection, day, generated):
     rows = _rows(connection, "SELECT * FROM offers")
+    # Decode the on-disk history format independently of the store. It contains
+    # daily group minima, not thousands of archived marketplace host listings.
+    if connection.execute("SELECT 1 FROM sqlite_master WHERE name='history_snapshots'").fetchone():
+        for snapshot in _rows(connection, 'SELECT * FROM history_snapshots'):
+            archived = json.loads(zlib.decompress(snapshot['payload']))
+            if len(archived) != snapshot['row_count'] or any(r['provider'] != snapshot['provider'] or r['day'] != snapshot['day'] for r in archived):
+                raise AuditError('history snapshot identity/count mismatch')
+            rows.extend(archived)
     for row in rows:
+        row['gpu_model'] = canonical_model(row['gpu_model'], row.get('vram_raw'))
         row['region'] = row['region'] or None
         for key in ('is_from_price','export_allowed'):
             row[key] = bool(row[key])
@@ -112,7 +136,7 @@ def _snapshot(connection, day, generated):
         if last and last['status']=='complete' and not stamp(last['started_at']) <= stamp(row['collected_at']) <= stamp(last['finished_at']):
             continue
         current.append(row)
-    current.sort(key=lambda r: (r['currency'],r['price_per_gpu_hour'],r['provider'],r['region'] or '',r['sku'],r['price_type']))
+    current.sort(key=lambda r: (r['currency'], r['price_per_gpu_hour'] is not None, r['price_per_gpu_hour'] or 0,r['provider'],r['region'] or '',r['sku'],r['price_type']))
     models, exports = {}, {}
     def exported(row):
         entry = {key:row.get(key) for key in FIELDS}
@@ -149,12 +173,13 @@ def _snapshot(connection, day, generated):
     coverage = []
     for key, provider in PROVIDERS.items():
         last = providers.get(key)
-        status = ('link_only' if provider['tier']=='D' else 'disabled') if not provider['enabled'] else ('stale_provider' if last and (last['status']=='failed' or last['started_at'][:10]!=day) else last['status'] if last else 'not_collected')
+        status = ('link_only' if provider['tier']=='D' or provider.get('link_only') else 'disabled') if not provider['enabled'] else ('stale_provider' if last and (last['status']=='failed' or last['started_at'][:10]!=day) else last['status'] if last else 'not_collected')
         coverage.append({'provider':key,'name':provider['name'],'tier':provider['tier'],'status':status,
             'model_count':len({r['gpu_model'] for r in rows if r['provider']==key}),
             'last_success':max((r['finished_at'] for r in runs if r['provider']==key and r['status']=='complete'),default=None)})
     return {'models':models,'exports':exports,'coverage':coverage,'date':day,'built':generated,'run':run,
-            'summary':{'models':len({r['gpu_model'] for r in good}),'offers':len(good),'regions':len({r['region'] for r in good})},
+            'summary':{'models':len({r['gpu_model'] for r in good}),'offers':len(good),'regions':len({r['region'] for r in good}),
+                       'providers':len({r['provider'] for r in good}), 'updated':max((r['collected_at'] for r in good), default=None)},
             'all_rows':rows,'last_updated':max((r['collected_at'] for r in rows),default=None),
             'current_updated':max((r['collected_at'] for r in current),default=None)}
 
@@ -196,11 +221,21 @@ class Page(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.stack, self.values, self.metadata, self.structured, self.times, self.graphs = [], [], {}, [], [], []
         self.faqs, self.title, self.text, self.unmarked = {}, "", "", []
+        self.cards, self.card = [], None
+        self.groups, self.offer_groups, self.summary_quotes, self.summary_strips = [], [], [], []
         self.feed(text)
         self.close()
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
+        if 'data-model-group' in a:self.groups.append((tag,a))
+        if 'data-offer-category' in a:self.offer_groups.append((tag,a))
+        if 'data-offer' in a:
+            group = next((f[1]['data-model-group'] for f in reversed(self.stack) if 'data-model-group' in f[1]), None)
+            offer_group=next((f[1]['data-offer-category'] for f in reversed(self.stack) if 'data-offer-category' in f[1]),None)
+            self.card = {'attrs':a, 'roles':{}, 'values':[], 'links':[], 'group':group, 'offer_group':offer_group}
+        if self.card is not None and tag == 'a':
+            self.card['links'].append(a)
         if tag == "meta":
             self.metadata[a.get("name", a.get("property"))] = a.get("content")
         if "data-bar" in a or "data-series" in a:
@@ -226,8 +261,20 @@ class Page(HTMLParser):
             return
         kind, a, chunks = self.stack.pop()
         text = ''.join(chunks)
+        if 'data-summary-offer' in a:self.summary_quotes.append((a['data-summary-offer'],text))
+        if a.get('class')=='summary-strip':self.summary_strips.append(text)
         if "data-stat" in a:
             self.values.append((a["data-stat"], a.get("data-format"), text))
+            if self.card is not None:
+                self.card['values'].append((a['data-stat'],a.get('data-format'),text))
+        if self.card is not None:
+            if kind == 'h3':self.card['roles']['offer-model']=text
+            if kind == 'a' and a.get('class')=='button':self.card['roles']['cta']=text
+            if a.get('class') in {'provider-pill','offer-region','offer-price','per-gpu','checked','price-unit','native-price','hardware','offer-badges','component-note','marketplace-note'}:
+                self.card['roles'][a['class']] = text
+            if kind == 'article' and 'data-offer' in a:
+                self.cards.append(self.card)
+                self.card = None
         if "data-faq" in a:
             self.faqs[int(a["data-faq"])] = text
         if kind == "title" and not any(f[0] == "svg" for f in self.stack):
@@ -277,6 +324,12 @@ def _allowed_literals(tr, facts):
     an exact localized definition. An extra unmarked '$9.99' fails the audit.
     """
     allowed = {v for v in tr.messages.values() if '{' not in v}
+    allowed.update(part.strip() for part in tr.messages['method_api'].split('{source}'))
+    # Exact localized referral disclosure, including the contractual 5% and
+    # public promo code. Changing either number must still fail the audit.
+    partner = json.loads((Path(__file__).resolve().parents[2] / 'config' / 'affiliates.json').read_text(encoding='utf-8'))['surflare']
+    allowed.add(tr.text('partner_copy', label=partner['label'], code=partner['promo_code']))
+    allowed.add(tr.text('partner_footer', code=partner['promo_code']))
     allowed.add("zhan999 [at] tutamail [dot] com")
     allowed.add(tr.text("basis") + " " + tr.text("maximum_def"))
     allowed.add(tr.text("model_intro", date=facts["date"]))
@@ -285,6 +338,7 @@ def _allowed_literals(tr, facts):
         allowed.add(tr.text("history_caption", kind=tr.text(kind)))
     for model in facts["models"]:
         allowed.update((model, tr.text("faq_heading", model=model), tr.text("faq_cheapest_q", model=model), model + " / " + tr.text("on_demand_from")))
+        allowed.add(tr.text('see_model',model=model))
         stats = facts["models"][model]["statistics"]
         count = tr.text("offer_count_one" if stats["offers"] == 1 else "offer_count_other", count="|VALUE|")
         regions = tr.text("region_count_one" if stats["region_count"] == 1 else "region_count_other", count="|VALUE|")
@@ -293,13 +347,169 @@ def _allowed_literals(tr, facts):
     for row in facts["all_rows"]:
         allowed.update((row["sku"], row["region"]))
         allowed.update(tr.text(k) + ": " + (row["region"] or tr.text("unknown_region")) for k in ("on_demand", "spot"))
-        if row["gpu_count"] < 1 or row["gpu_fraction"] < 1:
-            allowed.add(tr.text("fraction_note", share=str(Fraction(min(row["gpu_count"],row["gpu_fraction"])).limit_denominator(12))))
+        if _allocation(row) == 'fractional':
+            allowed.add(tr.text("fraction_note", share=str(Fraction(min(v for v in (row["gpu_count"],row["gpu_fraction"]) if v is not None)).limit_denominator(12))))
     allowed.update(spec.source_url.rsplit('/', 1)[-1] for spec in AZURE_SKUS.values())
     allowed.update(' / '.join(provider["gpu_models"]) for provider in PROVIDER_ONLY)
     # Home always presents these KPI labels even if not yet tracked.
     allowed.update(model + " / " + tr.text("on_demand_from") for model in ("H100 SXM 80GB", "H200 141GB", "A100 80GB"))
     return allowed
+
+
+def _audit_summary(page, entries, tr, facts, filename, errors):
+    """Re-select each quote from eligible SQL rows; verify complete visible copy.
+
+    Both the full text and the required numeric pointers must agree. Removing a
+    marker, changing provider/type/host, or substituting a native/promo offer
+    cannot make the strip pass merely by displaying a plausible dollar value.
+    """
+    good=[(p,r) for p,r in entries if _eligible(r)]
+    quotes=[];required=set();parts=[]
+    for family in ('H100','A100','RTX 4090'):
+        local=[e for e in good if model_family(e[1]['gpu_model'])==family and popular_rank(e[1]['gpu_model'])<len(POPULAR)]
+        if not local:continue
+        p,row=min(local,key=lambda e:(_rate(e[1]),e[1]['provider'],e[1]['region'] or '',e[0]))
+        region=tr.text('host_region',region=row['region']) if row['provider']=='clore' and row['region'] else row['region'] or tr.text('unknown_region')
+        qualifier=' · '+tr.text('tier_b' if row['tier']=='B' else 'tier_c') if row['tier'] in {'B','C'} else ''
+        text=tr.text('summary_from',model=row['gpu_model'],price=_dollars(_rate(row)))+' ('+tr.text(row['price_type'])+' · '+PROVIDERS[row['provider']]['name']+' · '+region+qualifier+')'
+        quotes.append((p,text));parts.append(text)
+        required.update(((p+'/gpu_model','text'),(p+'/price_per_gpu_hour','money')))
+        if row['region']:required.add((p+'/region','text'))
+    text=' • '.join(parts)+tr.text('summary_counts',offers=len(good),providers=len({r['provider'] for _,r in good}))
+    required.update((('/summary/offers','text'),('/summary/providers','text')))
+    if good:
+        text+=' · '+tr.text('summary_updated',time=datetime.fromisoformat(facts['summary']['updated'].replace('Z','+00:00')).strftime('%H:%M UTC'))
+        required.add(('/summary/updated','clock'))
+    if any(r['provider']=='clore' for _,r in good):
+        text+=tr.text('community_marketplace')+' · '+tr.text('clore_price_note')+' · '+tr.text('tax_unknown')
+    if page.summary_quotes!=quotes or page.summary_strips!=[text]:
+        errors.append(filename+': summary strip selection/price/type/provider/host/count/freshness mismatch')
+    if not required<={(p,f) for p,f,_ in page.values}:
+        errors.append(filename+': missing summary numeric audit marker')
+
+
+def _audit_cards(page, name, tr, facts, filename, errors):
+    """Independently reconstruct card selection, scopes, labels and default order.
+
+    The renderer is not an oracle: these identities and amounts come from SQL.
+    Native currencies and component rates must never be sorted as USD totals.
+    """
+    entries=[]
+    for model,data in facts['models'].items():
+        if name is not None and name != model:continue
+        stem='/models/'+model.replace('~','~0').replace('/','~1')+'/offers/'
+        entries.extend((stem+str(i),row) for i,row in enumerate(data['offers']))
+    fractional=lambda r:_allocation(r)=='fractional'
+    order=lambda item:(item[1]['currency']!='USD' or item[1]['price_scope']=='gpu_component' or _rate(item[1]) is None,item[1]['currency'],_rate(item[1]) if _rate(item[1]) is not None else item[1]['price_per_hour'],item[0])
+    expected=[]
+    if name is None:
+        minima=[]
+        for model in facts['models']:
+            local=[entry for entry in entries if entry[1]['gpu_model']==model and _eligible(entry[1])]
+            if local:minima.append(min(local,key=lambda e:(_rate(e[1]),e[1]['provider'],e[1]['region'] or '',e[0])))
+        def headline_key(entry):
+            row=entry[1];model=row['gpu_model'];rank=popular_rank(model)
+            capacity=re.search(r'(\d+(?:\.\d+)?)GB\b',model,re.I)
+            small=category(model)=='consumer' and (not capacity or float(capacity.group(1))<12)
+            return (0,rank,_rate(row),model) if rank<len(POPULAR) else (1,CATEGORIES.index(category(model)),small,_rate(row),model)
+        expected.extend((p,r,'cheapest') for p,r in sorted(minima,key=headline_key))
+        canonical_names=[canonical_model(c['attrs'].get('data-gpu-model','')) for c in page.cards if c['attrs'].get('data-list')=='cheapest']
+        if len(canonical_names)!=len(set(canonical_names)):
+            errors.append(filename+': duplicate canonical headline model')
+        group_keys=[]
+        for _,row,group in expected:
+            if group!='cheapest':continue
+            key='popular' if popular_rank(row['gpu_model'])<len(POPULAR) else category(row['gpu_model'])
+            if key not in group_keys:group_keys.append(key)
+        if [a.get('data-model-group') for _,a in page.groups]!=group_keys:
+            errors.append(filename+': GPU category/popular group order mismatch')
+        for tag,a in page.groups:
+            if a['data-model-group']=='legacy' and (tag!='details' or 'open' in a):
+                errors.append(filename+': legacy/mining group must be collapsed details')
+        _audit_summary(page,entries,tr,facts,filename,errors)
+    fraction_budget=min(20,sum(fractional(r) for _,r in entries)) if name is None else None
+    for fraction in (False,True):
+        local=sorted((e for e in entries if fractional(e[1])==fraction),key=order)
+        if fraction_budget is not None:
+            local=local[:fraction_budget if fraction else 100-fraction_budget]
+            def category_key(entry):
+                model=entry[1]['gpu_model'];key=category(model)
+                capacity=re.search(r'(\d+(?:\.\d+)?)GB\b',model,re.I)
+                small=key=='consumer' and (not capacity or float(capacity.group(1))<12)
+                return CATEGORIES.index(key),small
+            local.sort(key=category_key)
+        expected.extend((p,r,'fractional' if fraction else 'offers') for p,r in local)
+    for tag,attrs in page.offer_groups:
+        if attrs['data-offer-category']=='legacy' and (tag!='details' or 'open' in attrs):
+            errors.append(filename+': legacy offers must be collapsed details')
+    if [(c['attrs'].get('data-offer'),c['attrs'].get('data-list')) for c in page.cards] != [(p,g) for p,_,g in expected]:
+        errors.append(filename+': offer card selection/order differs from independent eligible population')
+    by_pointer={p:r for p,r,_ in expected}
+    for card in page.cards:
+        a,roles=card['attrs'],card['roles']
+        row=by_pointer.get(a.get('data-offer'))
+        if row is None:continue
+        instance=row['price_per_hour']*((row['gpu_count'] or 1) if row['price_scope']=='per_gpu' else 1)
+        provider=PROVIDERS[row['provider']]['name']
+        # links.py has the reviewed destination; brand spelling is not inferred.
+        from .links import link_for
+        link=link_for(row['provider'],row['sku'],row['region'],row['price_type'],model=row['gpu_model'])
+        url=next((item for item in card['links'] if item.get('class')=='button'),{})
+        if url.get('href')!=link['url'] or url.get('target')!='_blank' or url.get('rel')!=('sponsored nofollow noopener' if link['is_affiliate'] else 'nofollow noopener'):
+            errors.append(filename+': offer card destination/relationship mismatch')
+        pointer=a['data-offer']
+        count=str(int(row['gpu_count'])) if row['gpu_count'] in (1,2,4) and not fractional(row) else '8+' if row['gpu_count'] is not None and row['gpu_count']>=8 and not fractional(row) else 'other'
+        for attr,value in {'data-gpu-model':row['gpu_model'],'data-gpu-count':count,'data-provider':row['provider'],'data-price-type':row['price_type'],'data-region-class':_classification(row['region'])}.items():
+            if a.get(attr)!=value:errors.append(filename+': offer card '+attr+' mismatch')
+        for attr,value in (('data-sort-gpu',_rate(row)),('data-sort-instance',instance)):
+            target=value if value is not None and row['currency']=='USD' and row['price_scope']!='gpu_component' else math.inf
+            try:valid=math.isclose(float(a.get(attr,'')),target,rel_tol=1e-12,abs_tol=1e-12)
+            except ValueError:valid=False
+            if not valid:errors.append(filename+': offer card sort amount mismatch')
+        amount=_dollars(instance) if row['currency']=='USD' else format(instance,'g')
+        clock=datetime.fromisoformat(row['collected_at'].replace('Z','+00:00')).strftime('%H:%M UTC')
+        expected_roles={'provider-pill':provider,'offer-region':row['region'] or tr.text('unknown_region'),
+                        'offer-model':row['gpu_model']+' '+(format(row['gpu_count'],'g')+'×' if row['gpu_count'] is not None else tr.text('unknown_allocation')),
+                        'cta':tr.text('view_provider',provider=link['provider_name']),
+                        'offer-price':row['currency']+' '+amount+'/hr',
+                        'per-gpu':(('' if row['currency']=='USD' else row['currency']+' ')+(_dollars(_rate(row)) if row['currency']=='USD' else format(_rate(row),'g'))+' '+tr.text('per_gpu_hour') if _rate(row) is not None else tr.text('unknown_gpu_rate')),
+                        'checked':tr.text('checked_at',time=clock),
+                        'price-unit':tr.text('scope_gpu_component' if row['price_scope']=='gpu_component' else 'instance_hour')}
+        if row['original_currency'] and row['original_currency']!=row['currency']:
+            expected_roles['native-price']=tr.text('original_hourly')+': '+row['original_currency']+' '+format(row['original_price'],'g')+'/hr · '+tr.text('scope_'+row['price_scope'])
+        for role,value in expected_roles.items():
+            if roles.get(role)!=value:errors.append(filename+': offer card '+role+' mismatch')
+        hardware=' · '.join(tr.text(label)+': '+format(row[field],'g') for field,label in (('vcpu','vcpu'),('ram_gb','ram')) if row[field] is not None)
+        if roles.get('hardware','')!=hardware:errors.append(filename+': hardware must omit unknown fields')
+        if a.get('data-list')=='cheapest':
+            group='popular' if popular_rank(row['gpu_model'])<len(POPULAR) else category(row['gpu_model'])
+            if card['group']!=group:errors.append(filename+': headline in wrong GPU category')
+        elif name is None and card['offer_group']!=category(row['gpu_model']):
+            errors.append(filename+': index offer in wrong GPU category/disclosure')
+        badges=roles.get('offer-badges','')
+        tier_key={'A':'official_api','B':'tier_b','C':'tier_c'}[row['tier']]
+        for label in ('tax_'+row['tax_basis'],row['price_type'],tier_key):
+            if tr.text(label) not in badges:errors.append(filename+': missing offer card '+label+' label')
+        if row['provider']=='clore':
+            if tr.text('community_marketplace') not in badges or roles.get('marketplace-note') != tr.text('clore_price_note'):
+                errors.append(filename+': missing Clore marketplace/stablecoin qualifier')
+        if row['provider']=='ai_galaxy' and tr.text('promo_floor_price') not in badges:
+            errors.append(filename+': missing promotional floor-price label')
+        if _classification(row['region']) in {'edge','restricted'} and tr.text(_classification(row['region'])) not in badges:
+            errors.append(filename+': missing excluded-region badge')
+        if fractional(row) and tr.text('fractional') not in badges:
+            errors.append(filename+': missing fractional badge')
+        if row['is_from_price'] and tr.text('from_price') not in badges:
+            errors.append(filename+': missing advertised starting-price badge')
+        if row['price_scope']=='gpu_component' and roles.get('component-note') != tr.text('gpu_component_note'):
+            errors.append(filename+': missing CPU/RAM component-price qualifier')
+        present={(p,f) for p,f,_ in card['values']}
+        fields={'price_per_hour','price_per_gpu_hour','gpu_count','vcpu','ram_gb','price_conditions','gpu_model_raw','vram_raw'}
+        for field in fields:
+            if row[field] is not None and not any(p==pointer+'/'+field for p,_ in present):
+                errors.append(filename+': missing card source value '+field)
+        required={(pointer,'instance-money' if row['currency']=='USD' else 'instance-number'),(pointer+'/collected_at','clock')}
+        if not required<=present:errors.append(filename+': missing card price/freshness marker')
 
 
 def audit_site(connection_or_path, out):
@@ -324,12 +534,34 @@ def _audit(conn, out):
             errors.append(key + ': tier/export policy violation')
         if row['billing_unit'] not in {'instance-hour','instance-minute','instance-second','GPU-hour','gpu-hour','GPU-second'}:
             errors.append(key + ': unresolved billing unit (monthly prices forbidden)')
-        if row['price_scope'] not in {'instance','per_gpu','gpu_component'} or not math.isclose(row['price_per_gpu_hour'],_rate(row),rel_tol=1e-9):
+        rate=_rate(row)
+        if row['provider']=='clore':
+            daily=row.get('price_per_day')
+            if (not isinstance(daily,(int,float)) or not math.isfinite(daily) or daily<=0
+                    or row.get('source_billing_unit')!='instance-day' or not row.get('price_basis')
+                    or row['currency']!='USD' or not row['gpu_count'] or row['gpu_count']<1
+                    or not math.isclose(row['price_per_hour'],daily/24,rel_tol=1e-12)
+                    or not math.isclose(row['price_per_gpu_hour'],daily/(24*row['gpu_count']),rel_tol=1e-12)):
+                errors.append(key + ': Clore day/hour/GPU arithmetic mismatch')
+        if (row['price_scope'] not in {'instance','per_gpu','gpu_component'}
+                or (rate is None) != (row['price_per_gpu_hour'] is None)
+                or rate is not None and not math.isclose(row['price_per_gpu_hour'],rate,rel_tol=1e-9)):
             errors.append(key + ': price scope or per-GPU normalization mismatch')
         if row['original_currency'] and row['original_currency'] != row['currency']:
             if (not row['fx_date'] or row['fx_date'] > row['day'] or row['fx_source'] != 'https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml'
                     or not row['fx_rate'] or not math.isclose(row['original_price']*row['fx_rate'],row['price_per_hour'],rel_tol=1e-9)):
                 errors.append(key + ': invalid FX provenance')
+            usd, native = row.get('fx_usd_per_eur'), row.get('fx_original_per_eur')
+            if row['provider'] in {'anygpu','ai_galaxy'} or usd is not None or native is not None:
+                if (not usd or not native or not math.isfinite(usd) or not math.isfinite(native)
+                        or usd<=0 or native<=0 or not math.isclose(row['fx_rate'],usd/native,rel_tol=1e-12)
+                        or not math.isclose(row['price_per_hour'],row['original_price']*usd/native,rel_tol=1e-12)):
+                    errors.append(key + ': independent FX cross-rate conversion mismatch')
+        if row['provider'] in {'anygpu','ai_galaxy'}:
+            if row['tier']!='C' or row['export_allowed'] or row['original_currency']!='CNY':
+                errors.append(key + ': CNY display-only policy mismatch')
+            if row['provider']=='ai_galaxy' and not row['is_from_price']:
+                errors.append(key + ': promotional floor must be a from-price')
     catalogs = load_catalogs()
     expected_files = {"favicon.svg", "og.svg", "sitemap.xml", "robots.txt"}
     slugs = manifest["model_slugs"]
@@ -363,6 +595,20 @@ def _audit(conn, out):
                 try:
                     value = _resolve(page_facts, pointer)
                     expected = _dollars(value) if fmt == "money" else format(value, ".2f") + "%" if fmt == "percent" else format(value, "g") if fmt == "number" else value[:10] if fmt == "date" else str(value)
+                    if fmt.startswith('instance-'):
+                        amount=value['price_per_hour']*((value['gpu_count'] or 1) if value['price_scope']=='per_gpu' else 1)
+                        expected=_dollars(amount) if fmt=='instance-money' else format(amount,'g')
+                    elif fmt=='clock':
+                        expected=datetime.fromisoformat(value.replace('Z','+00:00')).strftime('%H:%M UTC')
+                    elif fmt=='vram':
+                        match=re.search(r'\b\d+(?:\.\d+)?\s*(?:GB|GiB)\b',value,re.I)
+                        expected=match.group() if match else '—'
+                    if fmt in {"history-min", "history-median", "history-max"}:
+                        statistic = fmt.removeprefix('history-')
+                        label = tr.text({'min': 'minimum', 'median': 'median', 'max': 'maximum'}[statistic])
+                        expected = value['day'] + ': ' + label + ' ' + _dollars(value[statistic])
+                        if statistic == 'median':
+                            expected += ' (n=' + str(value['count']) + ')'
                     if actual != expected:
                         errors.append(f"{filename} {pointer}: expected {expected!r}, found {actual!r}")
                 except (KeyError, IndexError, TypeError, ValueError):
@@ -373,6 +619,7 @@ def _audit(conn, out):
                 if text not in allowed:
                     errors.append(filename + ": unaccounted numeric text " + repr(text))
             present = {p for p, _, _ in page.values}
+            _audit_cards(page, name, tr, facts, filename, errors)
             if data:
                 for i, row in enumerate(data["offers"]):
                     prefix = "/models/" + name.replace("~", "~0").replace("/", "~1") + "/offers/" + str(i) + "/"
@@ -429,7 +676,11 @@ def _audit(conn, out):
             if facts["run"]:
                 allowed_times.add(facts["run"]["finished_at"])
             for stamp, text in page.times:
-                if stamp not in allowed_times or text != stamp[:10]:
+                try:clock=datetime.fromisoformat(stamp.replace('Z','+00:00')).strftime('%H:%M UTC')
+                except ValueError:
+                    errors.append(filename + ': invalid observation timestamp')
+                    continue
+                if stamp not in allowed_times or text not in {stamp[:10],clock}:
                     errors.append(filename + ": observation timestamp mismatch")
             html_pages += 1
     if set(manifest["files"]) != expected_files:
@@ -437,7 +688,7 @@ def _audit(conn, out):
     if errors:
         raise AuditError("Statistics audit FAILED (" + str(len(errors)) + " mismatches):\n" + "\n".join(errors[:40]))
     return {"status": "passed", "html_pages": html_pages, "json_exports": len(facts["exports"]), "values_checked": checked,
-            "observation_day": facts["date"], "basis": "current standard-region whole-GPU USD; separate types; tax excluded/unknown; A-only exports"}
+            "observation_day": facts["date"], "basis": "current standard/unspecified-region whole-GPU USD; separate types; tax excluded/unknown; A-only exports"}
 
 
 def live_sample(connection, n, *, client=None, rng=None):

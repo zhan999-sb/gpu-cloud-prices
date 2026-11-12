@@ -1,0 +1,39 @@
+{
+  "source_url": "https://www.gpushare.com/docs/getting-started/car/",
+  "fetched_at": "2026-11-12T15:27:55.104302+00:00",
+  "succeeded": true,
+  "record_count": 0,
+  "price_types": {},
+  "unknown_gpu_mapping_count": 0,
+  "cheapest": {
+    "RTX 4090": {},
+    "A100": {},
+    "H100": {}
+  },
+  "examples": [],
+  "limitations": [
+    "Bronze header has no explicit per-hour unit, so zero hourly offers are emitted.",
+    "RTX 3090 Ti is reported as 8GB and RTX 3080 Ti as 10GB in the price table; the GPU-information table states 24GB and 12GB."
+  ],
+  "excluded_observations": [
+    {
+      "gpu": "Tesla P4",
+      "vram": "8GB",
+      "bronze_amount_cny": 0.57,
+      "billing_period": null
+    },
+    {
+      "gpu": "GeForce RTX 3090 Ti",
+      "reported_vram": "8GB",
+      "canonical_vram": "24GB",
+      "bronze_amount_cny": 2.28,
+      "billing_period": null
+    },
+    {
+      "gpu": "NVIDIA A100",
+      "vram": "40GB",
+      "bronze_amount_cny": 3.04,
+      "billing_period": null
+    }
+  ]
+}

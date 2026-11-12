@@ -1,0 +1,68 @@
+{
+  "request": {
+    "method": "GET",
+    "authentication": false,
+    "cookies": false,
+    "user_agent": "gpu-price-index/0.1",
+    "timeout_seconds": 120,
+    "max_attempts": 3
+  },
+  "providers": {
+    "clore_marketplace": {
+      "url": "https://api.clore.ai/v1/marketplace",
+      "fetched_at": "2026-11-12T15:27:54.222124+00:00",
+      "bytes": 3927000,
+      "sha256": "f47c116dabb055db7972726df9d82c2a7a246f146bb3a6165bd7d5012e509866",
+      "content_type": "application/json; charset=utf-8",
+      "attempts": 1,
+      "succeeded": true,
+      "trim": "30 real servers, original order; fields projected to public price/specification/rental paths; all accepted fields unmodified",
+      "fixture": "clore_marketplace.json",
+      "fixture_bytes": 31551,
+      "fixture_sha256": "506f3b08ba962c6437542589533af73c75e3bf0ca7872e7d6728a2081a5965e7",
+      "fixture_record_count": 28
+    },
+    "anygpu": {
+      "url": "https://www.anygpu.cn/",
+      "fetched_at": "2026-11-12T15:28:14.552570+00:00",
+      "bytes": 108209,
+      "sha256": "65a8cef0cbed382b746856e1cbc166e396c09fd3f2231f12681d76a06f45aed3",
+      "content_type": "text/html",
+      "attempts": 1,
+      "succeeded": true,
+      "trim": "Three original GPU plan-card HTML fragments, including malformed RTX 5090 price",
+      "fixture": "anygpu.html",
+      "fixture_bytes": 15537,
+      "fixture_sha256": "db49d825e80c230552cd63abfca737c7759f39343a8b576a4fb8509aec6b99ac",
+      "fixture_record_count": 2
+    },
+    "gpushare_docs": {
+      "url": "https://www.gpushare.com/docs/getting-started/car/",
+      "fetched_at": "2026-11-12T15:27:55.104302+00:00",
+      "bytes": 54466,
+      "sha256": "5486efe299dd7dc34cb9a2a6ab736da87e8730b4f2932683129d32a8765c0fac",
+      "content_type": "text/html",
+      "attempts": 1,
+      "succeeded": true,
+      "trim": "None; full original HTML retained because the source table omits hourly units",
+      "fixture": "gpushare_docs.html",
+      "fixture_bytes": 54466,
+      "fixture_sha256": "5486efe299dd7dc34cb9a2a6ab736da87e8730b4f2932683129d32a8765c0fac",
+      "fixture_record_count": 0
+    },
+    "ai_galaxy": {
+      "url": "https://www.ai-galaxy.cn/",
+      "fetched_at": "2026-11-12T15:27:55.862996+00:00",
+      "bytes": 44405,
+      "sha256": "0076aefbb2e6ffb0da9b84993b19e634a25db6f0ae5e59544501e63892a5f2ab",
+      "content_type": "text/html;charset=utf-8",
+      "attempts": 1,
+      "succeeded": true,
+      "trim": "Eight original gpu-card HTML fragments including view-more CTA",
+      "fixture": "ai_galaxy.html",
+      "fixture_bytes": 9020,
+      "fixture_sha256": "3478e7ee20c612d5be7623ad37fb34954ecf9389df8c48c5fd0455b6fd76e433",
+      "fixture_record_count": 7
+    }
+  }
+}

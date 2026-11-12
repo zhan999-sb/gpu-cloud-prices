@@ -1,4 +1,4 @@
-"""Provider contract; only Azure is approved and registered in this MVP."""
+"""Provider contract for reviewed API catalogs and display-only page sources."""
 
 from typing import Protocol
 from ..schema import Offer

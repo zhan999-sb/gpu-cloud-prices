@@ -1,9 +1,22 @@
-"""Phase 1 policy registry. D providers deliberately have no collector."""
+"""Reviewed policies. Disabled and D providers deliberately have no collector."""
 PROVIDERS = {
+    "clore": {"name": "Clore.ai", "tier": "A", "enabled": True, "note": "note_clore", "source": "https://clore.ai/marketplace"},
+    "anygpu": {"name": "AnyGPU 算力云", "tier": "C", "enabled": True, "note": "note_anygpu", "source": "https://www.anygpu.cn/"},
+    "ai_galaxy": {"name": "智星云", "tier": "C", "enabled": True, "note": "note_ai_galaxy", "source": "https://www.ai-galaxy.cn/"},
     "azure": {"name": "Azure", "tier": "A", "enabled": True, "note": "note_azure", "source": "https://learn.microsoft.com/en-us/rest/api/cost-management/retail-prices/azure-retail-prices"},
     "linode": {"name": "Linode / Akamai", "tier": "A", "enabled": True, "note": "note_linode", "source": "https://techdocs.akamai.com/linode-api/reference/get-linode-types"},
     "scaleway": {"name": "Scaleway", "tier": "A", "enabled": True, "note": "note_scaleway", "source": "https://www.scaleway.com/en/developers/api/product-catalog/public-catalog"},
     "verda": {"name": "Verda / DataCrunch", "tier": "A", "enabled": True, "note": "note_verda", "source": "https://docs.verda.com/welcome-to-verda/release-notes/verda-api-changes/"},
+    "featurize": {"name": "Featurize", "tier": "C", "enabled": True, "note": "note_featurize", "source": "https://featurize.cn/vm/available"},
+    "nebius": {"name": "Nebius", "tier": "B", "enabled": True, "note": "note_nebius", "source": "https://nebius.com/prices"},
+    "lambda": {"name": "Lambda", "tier": "B", "enabled": True, "note": "note_lambda", "source": "https://lambda.com/pricing"},
+    "paperspace": {"name": "Paperspace", "tier": "C", "enabled": True, "note": "note_paperspace", "source": "https://www.paperspace.com/pricing"},
+    "baidu_gpu": {"name": "Baidu GPU", "tier": "C", "enabled": True, "note": "note_baidu_gpu", "source": "https://cloud.baidu.com/product-price/gpu.html"},
+    "runpod": {"name": "RunPod", "tier": "C", "enabled": False, "link_only": True, "note": "page_blocked_note", "source": "https://www.runpod.io/pricing"},
+    "digitalocean_gpu": {"name": "DigitalOcean GPU", "tier": "C", "enabled": False, "link_only": True, "note": "page_blocked_note", "source": "https://www.digitalocean.com/pricing/gpu-droplets"},
+    "salad": {"name": "Salad", "tier": "C", "enabled": False, "link_only": True, "note": "page_blocked_note", "source": "https://salad.com/pricing/"},
+    "thunder": {"name": "Thunder Compute", "tier": "C", "enabled": False, "link_only": True, "note": "page_blocked_note", "source": "https://www.thundercompute.com/pricing"},
+    "massedcompute": {"name": "Massed Compute", "tier": "C", "enabled": False, "link_only": True, "note": "page_blocked_note", "source": "https://vm.massedcompute.com/pricing"},
     "vultr": {"name": "Vultr", "tier": "A", "enabled": False, "note": "todo_vultr", "source": "https://api.vultr.com/v2/plans"},
     "oracle": {"name": "Oracle Cloud", "tier": "A", "enabled": False, "note": "todo_oracle", "source": "https://apexapps.oracle.com/pls/apex/cetools/api/v1/products/"},
     "ovh": {"name": "OVHcloud", "tier": "A", "enabled": False, "note": "todo_ovh", "source": "https://eu.api.ovh.com/1.0/order/catalog/public/cloud?ovhSubsidiary=FR"},

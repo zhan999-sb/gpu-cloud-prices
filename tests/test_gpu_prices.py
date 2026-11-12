@@ -4,6 +4,7 @@ from dataclasses import replace
 from datetime import datetime, timezone
 from email.message import Message
 from html.parser import HTMLParser
+from html import unescape
 from http.client import IncompleteRead
 from io import BytesIO
 import json
@@ -382,6 +383,116 @@ def test_site_from_fixtures_cheapest_html_json_and_history(tmp_path):
                 assert local.exists() or local.with_suffix(".html").exists(), href
 
 
+@pytest.mark.parametrize('corruption', [None, 'day', 'price', 'count', 'marker'])
+def test_history_titles_are_plain_audited_text_with_new_python_parser(tmp_path, monkeypatch, corruption):
+    """Reproduce gh-118350 (3.12.12+) even on an older Windows Python.
+
+    Older HTMLParser versions parse span children inside title. New versions
+    deliver them as literal RCDATA. Use that text-only behavior on every host;
+    timezone changes cannot reproduce this patch-version difference.
+    """
+    from pipelines.gpu_prices import audit as audit_module
+
+    class TextTitlePage(audit_module.Page):
+        CDATA_CONTENT_ELEMENTS = (*HTMLParser.CDATA_CONTENT_ELEMENTS, 'title')
+
+        def handle_data(self, data):
+            if self.stack and self.stack[-1][0] == 'title':
+                data = unescape(data)
+            super().handle_data(data)
+
+    # Prove the regression harness observes exactly the Actions failure mode.
+    legacy = TextTitlePage('<svg><title><span data-stat="/day">2026-11-12</span></title></svg>')
+    assert any('<span data-stat=' in text for text in legacy.unmarked)
+    monkeypatch.setattr(audit_module, 'Page', TextTitlePage)
+    with PriceStore(':memory:') as store:
+        store.upsert([offer(), offer(collected_at='2026-11-11T08:00:00Z',
+                                    price_per_hour=40, price_per_gpu_hour=5)])
+        result = build_site(store, tmp_path, today=TODAY, built_at=STAMP)
+        assert result['audit']['status'] == 'passed'
+        for lang in LANGUAGES:
+            path = tmp_path / lang.path('/h100-sxm-80gb/').lstrip('/') / 'index.html'
+            text = path.read_text(encoding='utf-8')
+            parser = StrictHTML()
+            parser.feed(text)
+            assert all('<span' not in str(value) for _, attrs in parser.attributes for value in attrs.values())
+            for svg in re.findall(r'<svg\b.*?</svg>', text, re.S):
+                element = ET.fromstring(svg)
+                for title in element.findall('.//{http://www.w3.org/2000/svg}title'):
+                    assert len(title) == 0 and '<span' not in (title.text or '')
+            assert '&lt;span' not in text
+        if corruption:
+            path = tmp_path / 'h100-sxm-80gb/index.html'
+            text = path.read_text(encoding='utf-8')
+            pattern = r'(<title data-stat="[^"]+" data-format="history-median">)(.*?)(</title>)'
+            def corrupt(match):
+                label = match[2]
+                if corruption == 'day':
+                    label = label.replace('2026-11-11', '2026-11-10')
+                elif corruption == 'price':
+                    label = label.replace('$5.00', '$99.00')
+                elif corruption == 'count':
+                    label = label.replace('n=1', 'n=9')
+                return ('<title>' if corruption == 'marker' else match[1]) + label + match[3]
+            path.write_text(re.sub(pattern, corrupt, text, count=1), encoding='utf-8')
+            with pytest.raises(AuditError):
+                audit_site(store.connection, tmp_path)
+
+
+def test_surflare_partner_placement_localization_and_numeric_audit(tmp_path):
+    partner = json.loads((Path(__file__).resolve().parents[1] / 'config/affiliates.json').read_text(encoding='utf-8'))['surflare']
+    catalogs = load_catalogs()
+    with PriceStore(':memory:') as store:
+        store.upsert([offer()])
+        build_site(store, tmp_path, today=TODAY, built_at=STAMP)
+        for path in tmp_path.rglob('*.html'):
+            text = path.read_text(encoding='utf-8')
+            lang = next(lang for lang in LANGUAGES if f'<html lang="{lang.code}"' in text)
+            tr = catalogs[lang.code]
+            assert '?' not in tr.text('partner_heading')
+            parser = StrictHTML()
+            parser.feed(text)
+            links = [attrs for tag, attrs in parser.links if tag == 'a' and attrs.get('href') == partner['url']]
+            is_home = path == tmp_path / lang.path().lstrip('/') / 'index.html'
+            assert len(links) == (2 if is_home else 1)
+            assert all(a['target'] == '_blank' and a['rel'] == 'sponsored nofollow noopener' for a in links)
+            footer = text[text.index('<footer>'):]
+            assert partner['url'] in footer
+            assert tr.html('partner_footer', code=partner['promo_code']) in footer
+            if is_home:
+                assert text.index('data-list="cheapest"') < text.index('data-offer-browser') < text.index('<aside class="partner-card"')
+                assert text.index('</section><script type="module">') < text.index('<aside class="partner-card"')
+                assert tr.html('partner_copy', label=partner['label'], code=partner['promo_code']) in text
+            else:
+                assert '<aside class="partner-card"' not in text
+            for table in re.findall(r'<table\b.*?</table>', text, re.S):
+                assert partner['url'] not in table
+        # Exact disclosure text is allowed; an altered discount or code is not.
+        home = tmp_path / 'index.html'
+        original = home.read_text(encoding='utf-8')
+        for before, after in [('5%', '6%'), (partner['promo_code'], 'wrong123')]:
+            home.write_text(original.replace(before, after), encoding='utf-8')
+            with pytest.raises(AuditError, match='unaccounted numeric text'):
+                audit_site(store.connection, tmp_path)
+        home.write_text(original, encoding='utf-8')
+        assert audit_site(store.connection, tmp_path)['status'] == 'passed'
+
+
+def test_build_cli_uses_injected_utc_snapshot_clock(tmp_path, capsys):
+    from pipelines.gpu_prices.run import main
+    db = tmp_path / 'prices.sqlite'
+    with PriceStore(db) as store:
+        store.upsert([offer()])
+    out = tmp_path / 'site'
+    assert main(['build', '--db', str(db), '--out', str(out), '--as-of', STAMP,
+                 '--site-base-url', 'https://gpu-cloud-prices.pages.dev']) == 0
+    result = json.loads(capsys.readouterr().out)['build']
+    assert result['offers_today'] == 1
+    manifest = json.loads((out / 'gpu-prices-manifest.json').read_text(encoding='utf-8'))
+    assert manifest['observation_day'] == TODAY
+    assert datetime.fromisoformat(manifest['generated_at']) == datetime.fromisoformat(STAMP.replace('Z', '+00:00'))
+
+
 def test_site_empty_stale_escape_and_owned_cleanup(tmp_path):
     readme = tmp_path / "README.md"
     readme.write_text("preserve", encoding="utf-8")
@@ -411,9 +522,11 @@ def test_cli_all_network_failure_builds_honest_empty_site(tmp_path, monkeypatch,
     from pipelines.gpu_prices import run
     class FailingCollector:
         pages_fetched = 0
+        def __init__(self, *args, **kwargs):
+            pass
         def collect(self, **kwargs):
             raise URLError("synthetic network outage")
-    for name in ("AzureCollector", "LinodeCollector", "ScalewayCollector", "VerdaCollector"):
+    for name in ("AzureCollector", "LinodeCollector", "ScalewayCollector", "VerdaCollector", "PageCollector", "CloreCollector"):
         monkeypatch.setattr(run, name, FailingCollector)
     monkeypatch.setattr(run, "refresh", lambda path: (None, "unavailable"))
     monkeypatch.setattr(run, "configure_logging", lambda: None)
@@ -1101,10 +1214,13 @@ def test_design_remains_local_responsive_and_all_new_strings_translated():
     assert not re.search(r'(?<!max-)(?<!min-)width\s*:\s*(?:3[6-9]\d|[4-9]\d\d|\d{4,})px', CSS)
     assert "@import" not in CSS and "url(" not in CSS
     catalogs = load_catalogs()
-    new_keys = {"basis", "disclosure", "fraction_note", "edge", "restricted", "no_discount", "faq_cheapest_a", "method_audit", "check_live"}
+    new_keys = {"basis", "disclosure", "fraction_note", "edge", "restricted", "no_discount", "faq_cheapest_a", "method_audit", "check_live",
+                "home_heading", "home_intro", "view_provider", "cheapest_models", "how_compare", "sort_gpu", "sort_instance",
+                "checked_at", "unknown_region", "see_model", "no_results", "no_usd_conversion", "full_vram", "offer_details"}
     for code, catalog in catalogs.items():
         assert new_keys <= catalog.messages.keys()
         for key in new_keys:
+            assert '??' not in catalog.messages[key]
             if code != "en":
                 assert catalog.messages[key] != catalogs["en"].messages[key]
 
@@ -1179,7 +1295,7 @@ def test_verda_verified_array_decimal_spot_and_unknown_region():
     assert len(rows)==2 and {r.price_type for r in rows}=={'on_demand','spot'}
     assert rows[0].gpu_model=='H100 SXM 80GB' and rows[0].price_per_hour==2.71
     assert all(r.region is None and r.vcpu is None and r.ram_gb is None for r in rows)
-    assert model_statistics(rows)['offers']==0
+    assert model_statistics(rows)['offers']==2
     with PriceStore(':memory:') as store:
         assert store.upsert(rows)==2 and store.upsert(rows)==0
         assert store.latest_prices()[0].region is None
@@ -1213,8 +1329,7 @@ def test_fx_ecb_cross_rates_dated_cache_and_native_fallback(tmp_path):
 @pytest.mark.parametrize('changes',[
     {'is_from_price':True},{'gpu_fraction':.5},{'tax_basis':'included'},
     {'price_scope':'gpu_component','price_per_hour':3},
-    {'effective_from':'2026-11-13T00:00:00Z'}, {'effective_to':'2026-11-12T00:00:00Z'},
-    {'region':None}])
+    {'effective_from':'2026-11-13T00:00:00Z'}, {'effective_to':'2026-11-12T00:00:00Z'}])
 def test_headline_policy_refuses_noncomparable_rows(changes):
     good=offer()
     bad=offer(sku='excluded',price_per_hour=.08,price_per_gpu_hour=.01,**{k:v for k,v in changes.items() if k!='price_per_hour'})
@@ -1231,7 +1346,8 @@ def test_scope_monthly_export_and_variant_contracts():
         'A100 40GB','A100 80GB','RTX 4090 24GB','RTX 4090 48GB']})==7
 
 
-def test_additive_legacy_migration_keeps_every_original_value(tmp_path):
+@pytest.mark.parametrize('quoted_table', [False, True])
+def test_additive_legacy_migration_keeps_every_original_value(tmp_path, quoted_table):
     import sqlite3
     path=tmp_path/'legacy.sqlite'
     fields='provider sku gpu_model gpu_count vcpu ram_gb region price_type currency price_per_hour price_per_gpu_hour source_url collected_at day'.split()
@@ -1239,6 +1355,9 @@ def test_additive_legacy_migration_keeps_every_original_value(tmp_path):
     with sqlite3.connect(path) as conn:
         conn.execute('CREATE TABLE offers (provider TEXT NOT NULL,sku TEXT NOT NULL,gpu_model TEXT NOT NULL,gpu_count REAL NOT NULL,vcpu INTEGER NOT NULL,ram_gb REAL NOT NULL,region TEXT NOT NULL,price_type TEXT NOT NULL,currency TEXT NOT NULL,price_per_hour REAL NOT NULL,price_per_gpu_hour REAL NOT NULL,source_url TEXT NOT NULL,collected_at TEXT NOT NULL,day TEXT NOT NULL,PRIMARY KEY(provider,sku,region,price_type,day))')
         conn.execute('INSERT INTO offers VALUES ('+','.join('?' for _ in fields)+')',[row[k] for k in fields])
+        if quoted_table:
+            conn.execute('ALTER TABLE offers RENAME TO original_offers')
+            conn.execute('ALTER TABLE original_offers RENAME TO offers')
     with PriceStore(path) as store:
         actual=dict(store.connection.execute('SELECT * FROM offers').fetchone())
         assert {k:actual[k] for k in fields}=={k:row[k] for k in fields}
@@ -1278,3 +1397,295 @@ def test_vast_config_fallback_and_empty_environment_override(monkeypatch):
     monkeypatch.setenv('AFFILIATE_VAST_REF','')
     assert not link_for('vast','','','')['is_affiliate']
     assert not link_for('together','','','')['is_affiliate']
+
+
+def test_prices_first_unknown_region_and_instance_scope_cards(tmp_path):
+    from pipelines.gpu_prices.audit import Page
+    values=[offer(gpu_count=1,price_per_hour=2,price_per_gpu_hour=2),
+            offer(provider='verda',sku='unspecified',region=None,gpu_count=2,price_scope='per_gpu',
+                  price_per_hour=.406,price_per_gpu_hour=.406,tax_basis='unknown'),
+            offer(sku='edge',region='attdallas1',price_per_hour=.08,price_per_gpu_hour=.01),
+            offer(sku='tax-included',price_per_hour=.16,price_per_gpu_hour=.02,tax_basis='included'),
+            offer(sku='fraction',gpu_count=.5,gpu_fraction=.5,price_per_hour=.01,price_per_gpu_hour=.02)]
+    with PriceStore(':memory:') as store:
+        store.upsert(values)
+        build_site(store,tmp_path,today=TODAY,built_at=STAMP)
+        assert audit_site(store.connection,tmp_path)['status']=='passed'
+    html=(tmp_path/'index.html').read_text(encoding='utf-8')
+    cards=Page(html).cards
+    cheapest=[c for c in cards if c['attrs']['data-list']=='cheapest']
+    assert len(cheapest)==1 and cheapest[0]['attrs']['data-provider']=='verda'
+    assert cheapest[0]['roles']['offer-price']=='USD $0.812/hr'
+    assert cheapest[0]['roles']['per-gpu']=='$0.406 per GPU-hour'
+    assert cheapest[0]['roles']['checked']=='checked 08:00 UTC'
+    assert cheapest[0]['roles']['offer-region']=='Region not specified by provider'
+    assert cheapest[0]['roles']['cta']=='View on Verda / DataCrunch →'
+    assert 'Tax unknown' in cheapest[0]['roles']['offer-badges']
+    assert html.index('data-list="cheapest"')<html.index('data-offer-browser')<html.index('class="partner-card"')<html.index('class="comparison"')
+    assert '<div class="filters" hidden>' in html
+    assert all('hidden' not in c['attrs'] for c in cards)  # Server output is usable with JS disabled.
+    for field in ('gpu-model','gpu-count','provider','price-type','region-class'):
+        assert f'data-filter="{field}"' in html
+    model=(tmp_path/'h100-sxm-80gb/index.html').read_text(encoding='utf-8')
+    tr=load_catalogs()['en']
+    assert model.index('data-offer-browser')<model.index(tr.html('regions_heading'))<model.index(tr.html('history_heading'))<model.index('class="faq"')
+    exported=json.loads((tmp_path/'data/h100-sxm-80gb.json').read_text(encoding='utf-8'))
+    assert exported['statistics']['cheapest']['on_demand']==.406
+    assert exported['history']['on_demand'][-1]['min']==.406
+
+
+def test_home_offer_cap_and_model_page_keeps_all_observations(tmp_path):
+    from pipelines.gpu_prices.audit import Page
+    with PriceStore(':memory:') as store:
+        store.upsert([offer(sku=f'gpu-{i}',gpu_count=1,price_per_hour=(i+1)/100,price_per_gpu_hour=(i+1)/100) for i in range(105)])
+        build_site(store,tmp_path,today=TODAY,built_at=STAMP)
+    home=Page((tmp_path/'index.html').read_text(encoding='utf-8'))
+    model=Page((tmp_path/'h100-sxm-80gb/index.html').read_text(encoding='utf-8'))
+    assert len(home.cards)==101 and len(model.cards)==105
+    rates=[float(c['attrs']['data-sort-gpu']) for c in home.cards if c['attrs']['data-list']=='offers']
+    assert rates==sorted(rates) and rates[0]==.01 and rates[-1]==1
+    assert 'See all for H100 SXM 80GB' in home.text and 'up to 100 offers' in home.text
+
+
+def test_capped_home_keeps_fractional_group_and_native_prices_are_not_usd(tmp_path):
+    from pipelines.gpu_prices.audit import Page
+    from pipelines.gpu_prices.fx import to_usd, URL
+    euro=offer(provider='scaleway',sku='converted',gpu_model='H200 141GB',gpu_count=2,
+               currency='EUR',price_per_hour=3,price_per_gpu_hour=1.5,original_currency='EUR',original_price=3)
+    converted=to_usd(euro,{'date':TODAY,'rates':{'USD':1.2,'EUR':1},'source':URL})
+    with PriceStore(':memory:') as store:
+        store.upsert([offer(sku=f'whole-{i}') for i in range(105)]+[
+            offer(sku='partial',gpu_count=.5,gpu_fraction=.5,price_per_hour=.01,price_per_gpu_hour=.02),
+            converted,replace(euro,sku='native',gpu_model='L4 24GB')])
+        build_site(store,tmp_path,today=TODAY,built_at=STAMP)
+        assert audit_site(store.connection,tmp_path)['status']=='passed'
+    home=Page((tmp_path/'index.html').read_text(encoding='utf-8'))
+    assert len([c for c in home.cards if c['attrs']['data-list'] in {'offers','fractional'}])==100
+    assert len([c for c in home.cards if c['attrs']['data-list']=='fractional'])==1
+    h200=Page((tmp_path/'h200-141gb/index.html').read_text(encoding='utf-8'))
+    assert h200.cards[0]['roles']['offer-price']=='USD $3.60/hr'
+    assert h200.cards[0]['roles']['native-price']=='Original hourly price: EUR 3/hr · Instance'
+    native=Page((tmp_path/'l4-24gb/index.html').read_text(encoding='utf-8'))
+    assert native.cards[0]['roles']['offer-price']=='EUR 3/hr'
+    assert native.cards[0]['attrs']['data-sort-gpu']=='Infinity'
+    assert 'USD conversion unavailable' in native.text
+    assert not any(c['attrs']['data-gpu-model']=='L4 24GB' and c['attrs']['data-list']=='cheapest' for c in home.cards)
+
+
+@pytest.mark.parametrize('damage',['selection','currency','region','clock','sort','cta','badge','derived-total'])
+def test_audit_rejects_corrupt_offer_card_semantics(tmp_path,damage):
+    with PriceStore(':memory:') as store:
+        store.upsert([offer(provider='verda',region=None,gpu_count=2,price_scope='per_gpu',price_per_hour=.406,price_per_gpu_hour=.406)])
+        build_site(store,tmp_path,today=TODAY,built_at=STAMP)
+        home=tmp_path/'index.html';original=home.read_text(encoding='utf-8')
+        before,after={
+            'selection':('data-list="cheapest"','data-list="offers"'),
+            'currency':('<span class="currency">USD','<span class="currency">EUR'),
+            'region':('class="offer-region">Region not specified by provider','class="offer-region">eastus'),
+            'clock':('data-format="clock">08:00 UTC','data-format="clock">09:00 UTC'),
+            'sort':('data-sort-gpu="0.406"','data-sort-gpu="0.00406"'),
+            'cta':('View on Verda / DataCrunch →','View on Azure →'),
+            'badge':('class="tag tax_unknown">Tax unknown','class="tag tax_unknown">Tax excluded'),
+            'derived-total':('data-format="instance-money">$0.812','data-format="instance-money">$0.406'),
+        }[damage]
+        assert before in original
+        home.write_text(original.replace(before,after,1),encoding='utf-8')
+        with pytest.raises(AuditError,match='Statistics audit FAILED'):
+            audit_site(store.connection,tmp_path)
+
+
+PAGE_COUNTS = {'featurize': 11, 'nebius': 14, 'lambda': 22, 'paperspace': 13, 'baidu_gpu': 31}
+
+
+def page_html(name):
+    name = 'lambda_' if name == 'lambda' else name
+    return (Path(__file__).parent / 'fixtures/provider_pages' / (name + '.html')).read_bytes()
+
+
+class PageClient:
+    def __init__(self, name, failure=None):
+        self.name, self.failure, self.calls = name, failure, []
+
+    def get_bytes(self, url, *, accept):
+        self.calls.append((url, accept))
+        if self.failure == 'network':
+            raise URLError('synthetic outage')
+        return b'<h1>changed page</h1>' if self.failure == 'parse' else page_html(self.name)
+
+
+def fixture_page_offers(name, stamp=STAMP):
+    from pipelines.gpu_prices.providers.page_collector import PARSERS, normalize
+    return [normalize(row) for row in PARSERS[name].parse(page_html(name).decode('utf-8'), stamp)]
+
+
+@pytest.mark.parametrize('name', PAGE_COUNTS)
+def test_page_collectors_normalize_real_fixtures_without_inventing_allocations(name):
+    from pipelines.gpu_prices.providers.page_collector import PageCollector
+    from pipelines.gpu_prices.providers.registry import PROVIDERS
+    client = PageClient(name)
+    with PriceStore(':memory:') as store:
+        collector = PageCollector(name, store=store, client=client, clock=lambda: STAMP)
+        rows = collector.collect()
+        assert collector.complete and collector.pages_fetched == 1
+        assert len(rows) == collector.raw_items == PAGE_COUNTS[name]
+        assert client.calls == [(PROVIDERS[name]['source'], 'text/html')]
+        assert all(o.tier == PROVIDERS[name]['tier'] and not o.export_allowed for o in rows)
+        assert all(not o.gpu_model.startswith('NVIDIA ') for o in rows)
+        assert store.upsert(rows) == PAGE_COUNTS[name]
+        expected = [replace(o, collected_at='2026-11-12T08:00:00.000000Z') for o in rows]
+        assert store.latest_prices() == sorted(expected, key=lambda o: (o.currency, o.price_per_gpu_hour is not None, o.price_per_gpu_hour or 0, o.provider, o.region or '', o.sku, o.price_type))
+        if name in {'featurize', 'paperspace'}:
+            assert all(o.gpu_count is None and o.price_per_gpu_hour is None for o in rows)
+            assert model_statistics(rows)['offers'] == 0
+        if name == 'nebius':
+            assert all(o.gpu_count is None and o.price_scope == 'gpu_component' for o in rows)
+            assert all(o.price_per_gpu_hour == o.price_per_hour for o in rows)
+        if name == 'baidu_gpu':
+            assert all(o.vcpu is None and o.cpu_raw for o in rows)
+            fractional = next(o for o in rows if o.gpu_fraction == .25)
+            assert fractional.gpu_count is None
+            assert fractional.price_per_gpu_hour == fractional.price_per_hour * 4
+
+
+@pytest.mark.parametrize('failure', [None, 'network', 'parse'])
+def test_hourly_page_budget_survives_reopen_failure_and_workflow_overlap(tmp_path, failure):
+    from pipelines.gpu_prices.providers.page_collector import PageCollector
+    path, client = tmp_path / 'hourly.sqlite', PageClient('featurize', failure)
+    with PriceStore(path) as store:
+        collector = PageCollector('featurize', store=store, client=client, clock=lambda: STAMP)
+        if failure:
+            with pytest.raises((URLError, ValueError)):
+                collector.collect()
+        else:
+            collector.collect()
+        assert store.connection.execute("SELECT value FROM meta WHERE key='page_last_fetch:featurize'").fetchone()[0] == STAMP
+    with PriceStore(path) as store, PriceStore(path) as overlapping:
+        for stamp in ('2026-11-12T08:15:00Z', '2026-11-12T08:59:59Z'):
+            skipped = PageCollector('featurize', store=overlapping, client=client, clock=lambda: stamp)
+            assert skipped.collect() == [] and skipped.skipped
+        assert len(client.calls) == 1
+        # Another provider has a separate budget, and exactly 60 minutes is due.
+        assert store.claim_page_fetch('nebius', '2026-11-12T08:15:00Z')
+        assert store.claim_page_fetch('featurize', '2026-11-12T09:00:00Z')
+        assert not overlapping.claim_page_fetch('featurize', '2026-11-12T09:00:00Z')
+
+
+@pytest.mark.parametrize('status', [403, 429, 500])
+def test_page_http_errors_never_retry_inside_the_hour(status):
+    calls, sleeps = [], []
+    url = 'https://featurize.cn/vm/available'
+    def opener(req, timeout):
+        calls.append(req)
+        assert req.get_header('Accept') == 'text/html'
+        assert req.get_header('Authorization') is None and req.get_header('Cookie') is None
+        raise HTTPError(url, status, 'synthetic failure', {'Retry-After': '60'}, BytesIO(b'failed'))
+    with pytest.raises(HTTPError):
+        http.HttpClient(opener=opener, sleep=sleeps.append).get_bytes(url, accept='text/html')
+    assert len(calls) == 1 and not sleeps
+
+
+def test_blocked_page_providers_remain_link_only_and_outside_http_allowlist():
+    from pipelines.gpu_prices.providers.page_collector import PARSERS
+    from pipelines.gpu_prices.providers.registry import PROVIDERS
+    from pipelines.gpu_prices.links import PROVIDER_ONLY
+    for name in ('runpod', 'digitalocean_gpu', 'salad', 'thunder', 'massedcompute'):
+        assert not PROVIDERS[name]['enabled'] and PROVIDERS[name]['link_only']
+        assert name not in PARSERS
+        assert any(p['provider'] == name for p in PROVIDER_ONLY)
+        with pytest.raises(ValueError, match='allowlist'):
+            http.validate_url(PROVIDERS[name]['source'])
+
+
+def test_page_cli_persists_hourly_skips_without_replacing_success(tmp_path, monkeypatch, capsys):
+    from pipelines.gpu_prices import run
+    from pipelines.gpu_prices.providers.page_collector import PageCollector
+    from pipelines.gpu_prices.fx import URL
+    clients = {name: PageClient(name) for name in ('featurize', 'baidu_gpu')}
+    monkeypatch.setattr(run, 'PageCollector', lambda name, store: PageCollector(name, store=store, client=clients[name], clock=lambda: STAMP))
+    monkeypatch.setattr(run, 'configure_logging', lambda: None)
+    rates = {'date': '2026-11-11', 'source': URL, 'rates': {'EUR': 1, 'USD': 1.2, 'CNY': 8}}
+    monkeypatch.setattr(run, 'refresh', lambda path: (rates, 'fresh'))
+    args = ['collect', '--db', str(tmp_path/'cli.sqlite'), '--provider', 'featurize', '--provider', 'baidu_gpu']
+    assert run.main(args) == 0
+    first = json.loads(capsys.readouterr().out)
+    assert {name: entry['records'] for name, entry in first['collections'].items()} == {'featurize': 11, 'baidu_gpu': 31}
+    assert first['fx']['status'] == 'fresh'
+    assert run.main(args) == 0
+    second = json.loads(capsys.readouterr().out)
+    assert all(entry['status'] == 'skipped' and entry['pages'] == 0 for entry in second['collections'].values())
+    with PriceStore(tmp_path/'cli.sqlite') as store:
+        assert store.connection.execute('SELECT COUNT(*) FROM collection_runs').fetchone()[0] == 2
+        assert all(o.original_currency == 'CNY' and o.fx_date == rates['date'] for o in store.latest_prices())
+        assert all(o.collected_at == '2026-11-12T08:00:00.000000Z' for o in store.latest_prices())
+    assert all(len(client.calls) == 1 for client in clients.values())
+
+
+def test_lambda_effective_boundary_and_all_page_rows_across_eight_languages(tmp_path):
+    from pipelines.gpu_prices.audit import Page
+    from pipelines.gpu_prices.fx import to_usd, URL
+    from pipelines.gpu_prices.regions import eligible
+    rates = {'date': '2026-11-11', 'source': URL, 'rates': {'EUR': 1, 'USD': 1.2, 'CNY': 8}}
+    page_rows = [to_usd(o, rates) for name in PAGE_COUNTS for o in fixture_page_offers(name)]
+    future = [o for o in page_rows if o.provider == 'lambda']
+    assert not any(o.current_at('2026-11-15T23:59:59.999999Z') for o in future)
+    assert all(o.current_at('2026-11-16T00:00:00Z') for o in future)
+    assert model_statistics(future, at='2026-11-15T23:59:59Z')['offers'] == 0
+    assert model_statistics(future, at='2026-11-16T00:00:00Z')['offers'] == 22
+    baseline = offer(gpu_model='V100 16GB', sku='shared-model', gpu_count=1, price_per_hour=2.4, price_per_gpu_hour=2.4)
+    with PriceStore(':memory:') as store:
+        assert store.upsert(page_rows + [baseline]) == 92
+        built = build_site(store, tmp_path, today=TODAY, built_at=STAMP)
+        assert built['offers_today'] == 70 and built['audit']['status'] == 'passed'
+        assert audit_site(store.connection, tmp_path)['status'] == 'passed'
+        current = store.current_prices(TODAY, STAMP)
+        for lang in LANGUAGES:
+            tr = load_catalogs()[lang.code]
+            home = Page((tmp_path/lang.path().lstrip('/')/'index.html').read_text(encoding='utf-8'))
+            cheapest = [c for c in home.cards if c['attrs']['data-list'] == 'cheapest']
+            assert len(cheapest) == len({o.gpu_model for o in current if eligible(o)})
+            assert all(c['attrs']['data-provider'] in {'azure', 'baidu_gpu'} for c in cheapest)
+            nebius_page = tmp_path/lang.path('/hgx-h100/').lstrip('/')/'index.html'
+            text = nebius_page.read_text(encoding='utf-8')
+            assert tr.text('gpu_component_note') in unescape(text)
+            assert tr.text('tier_b') in unescape(text)
+            assert all(c['attrs']['data-provider'] != 'lambda' for c in home.cards)
+            # The standalone component prices remain display only, without downloads.
+            assert 'DataDownload' not in text
+        exports = list((tmp_path/'data').glob('*.json'))
+        assert len(exports) == 1
+        data = json.loads(exports[0].read_text(encoding='utf-8'))
+        assert {r['provider'] for r in data['offers']} == {'azure'}
+        assert 'price_conditions' in data['offers'][0]
+        # A second build after the exact activation boundary admits Lambda.
+        store.upsert(fixture_page_offers('lambda', '2026-11-16T00:00:00Z'))
+        after = build_site(store, tmp_path, today='2026-11-16', built_at='2026-11-16T00:00:00Z')
+        assert after['offers_today'] == 22 and after['audit']['status'] == 'passed'
+
+
+@pytest.mark.parametrize('damage', ['component', 'tier', 'conditions', 'unknown-rate'])
+def test_independent_audit_detects_page_price_qualifier_corruption(tmp_path, damage):
+    rows = [fixture_page_offers('nebius')[0], fixture_page_offers('paperspace')[0]]
+    conditional = next(o for o in fixture_page_offers('paperspace') if o.price_type == 'reserved')
+    rows.append(conditional)
+    with PriceStore(':memory:') as store:
+        store.upsert(rows)
+        build_site(store, tmp_path, today=TODAY, built_at=STAMP)
+        home = tmp_path/'index.html'
+        text = home.read_text(encoding='utf-8')
+        old, new = {
+            'component': ('GPU only; CPU/RAM billed separately', 'GPU includes CPU/RAM'),
+            'tier': ('C · Display only', 'A · Official API'),
+            'conditions': ('3-year commitment', '1-year commitment'),
+            'unknown-rate': ('Per-GPU rate unavailable: allocation unknown', '$0.001 per GPU-hour'),
+        }[damage]
+        assert old in text
+        home.write_text(text.replace(old, new), encoding='utf-8')
+        with pytest.raises(AuditError):
+            audit_site(store.connection, tmp_path)
+
+
+def test_fx_missing_cny_rate_keeps_native_instance_price():
+    from pipelines.gpu_prices.fx import to_usd, URL
+    original = fixture_page_offers('featurize')[0]
+    rates = {'date': '2026-11-11', 'source': URL, 'rates': {'EUR': 1, 'USD': 1.2}}
+    assert to_usd(original, rates) == original

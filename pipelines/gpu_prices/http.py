@@ -13,7 +13,18 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 LOG = logging.getLogger(__name__)
 USER_AGENT = "gpu-price-index/0.1 (+contact in site footer)"
+PAGE_ENDPOINTS = {
+    "www.anygpu.cn": {"/"},
+    "www.ai-galaxy.cn": {"/"},
+    "api.clore.ai": {"/v1/marketplace"},
+    "featurize.cn": {"/vm/available"},
+    "nebius.com": {"/prices"},
+    "lambda.com": {"/pricing"},
+    "www.paperspace.com": {"/pricing"},
+    "cloud.baidu.com": {"/product-price/gpu.html"},
+}
 ENDPOINTS = {
+    **PAGE_ENDPOINTS,
     "prices.azure.com": {"/api/retail/prices"},
     "api.linode.com": {"/v4/linode/types", "/v4/regions", "/v4/regions/availability"},
     "api.scaleway.com": {"/product-catalog/v2alpha1/public-catalog/products"},
@@ -74,7 +85,11 @@ class HttpClient:
 
     def get_bytes(self, url: str, *, accept="application/json") -> bytes:
         validate_url(url)  # Validation errors never retry or send a request.
-        for attempt in range(ATTEMPTS):
+        parts = urlsplit(url)
+        # Page requests have a DB-backed hourly budget. A transient failure also
+        # consumes it: do not issue extra requests inside the retry loop.
+        attempts = 1 if parts.path in PAGE_ENDPOINTS.get(parts.hostname, set()) else ATTEMPTS
+        for attempt in range(attempts):
             retry_after = 0.0
             try:
                 request = Request(url, headers={"User-Agent": USER_AGENT, "Accept": accept})
@@ -94,7 +109,7 @@ class HttpClient:
                 error = exc
             except (URLError, TimeoutError, ConnectionError, OSError, IncompleteRead) as exc:
                 error = exc
-            if attempt == ATTEMPTS - 1:
+            if attempt == attempts - 1:
                 raise error
             delay = max(retry_after, 2 ** attempt + self._jitter())
             LOG.warning("HTTP attempt %d/%d failed (%s); retry in %.2fs", attempt + 1, ATTEMPTS, error, delay)

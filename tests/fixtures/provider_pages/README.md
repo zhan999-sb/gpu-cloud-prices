@@ -1,5 +1,12 @@
 # Official pricing page fixtures, observed 2026-11-12
 
+Integration note: `providers/page_collector.py` now connects the five verified
+parsers to the pipeline. The preparation evidence below remains historical.
+Featurize is now C/display-only under agreement 7.1/7.3, superseding the original
+spec's provisional B; the saved HTML bytes and fetch manifest are unchanged.
+The hourly DB budget covers successful and failed attempts. Explicit per-card
+rental text is required before assigning Featurize a single-GPU allocation.
+
 These are trimmed fragments of actual plain GET responses, not reconstructed
 tables or prices copied from the provider spec. All fragments are below
 200,000 UTF-8 bytes. The SHA-256 of each full response and each retained fixture,

@@ -65,7 +65,7 @@ def test_fixture_identity_size_and_single_get(name):
         "cookies": False, "authentication": False,
     }
     assert module(name).URLS == (info["url"],)
-    assert module(name).TIER == ("B" if name in {"featurize", "nebius", "lambda_"} else "C")
+    assert module(name).TIER == ("B" if name in {"nebius", "lambda_"} else "C")
 
 
 @pytest.mark.parametrize("name", ALL)
@@ -192,6 +192,15 @@ def test_no_count_inventory_tax_region_inference():
     # Physical host identifiers/IPs from hydration must not be saved as fixtures.
     assert "internalIp" not in fixture("featurize")
     assert "__NEXT_DATA__" not in fixture("featurize")
+
+
+@pytest.mark.parametrize('label', ['每卡租赁', '单卡实例', '按卡租用'])
+def test_featurize_single_gpu_requires_explicit_per_card_rental(label):
+    rows = module('featurize').parse('<p>' + label + '</p>' + fixture('featurize'), FETCHED_AT)
+    assert all(r['gpu_count'] == 1 and r['gpu_fraction'] == 1 for r in rows)
+    assert all(r['tier'] == 'C' and r['export_allowed'] is False for r in rows)
+    # The inventory count on its own must never supply an instance allocation.
+    assert all(r['gpu_count'] is None for r in parsed('featurize'))
 
 
 def test_missing_explicit_inventory_is_unknown_despite_rent_buttons():

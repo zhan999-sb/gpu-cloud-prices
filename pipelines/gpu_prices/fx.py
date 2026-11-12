@@ -60,9 +60,11 @@ def refresh(path, *, client=None):
 def to_usd(offer, rates):
     if offer.currency == "USD":
         return offer
-    if not rates or rates["date"] > offer.day:
+    if not rates or rates["date"] > offer.day or offer.currency not in rates["rates"]:
         return offer  # Display native currency; never invent a USD equivalent.
     rate = rates["rates"]["USD"] / rates["rates"][offer.currency]
     return validate_offer(replace(offer, original_currency=offer.currency, original_price=offer.price_per_hour,
         currency="USD", price_per_hour=offer.price_per_hour * rate,
-        price_per_gpu_hour=offer.price_per_gpu_hour * rate, fx_rate=rate, fx_date=rates["date"], fx_source=rates["source"]))
+        price_per_gpu_hour=offer.price_per_gpu_hour * rate if offer.price_per_gpu_hour is not None else None,
+        fx_usd_per_eur=rates['rates']['USD'], fx_original_per_eur=rates['rates'][offer.currency],
+        fx_rate=rate, fx_date=rates["date"], fx_source=rates["source"]))

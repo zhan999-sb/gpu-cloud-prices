@@ -55,7 +55,7 @@ fr-par-1 fr-par-3 nl-ams-1 nl-ams-2 nl-ams-3 pl-waw-1 pl-waw-2 pl-waw-3""".split
 
 
 def region_class(region: str | None) -> str:
-    if region is None:
+    if not region:
         return "unknown_region"
     key = region.casefold()
     if key.startswith("att"):
@@ -67,8 +67,8 @@ def region_class(region: str | None) -> str:
 
 
 def eligible(offer, *, currency="USD") -> bool:
-    return (offer.currency == currency and offer.gpu_count >= 1 and float(offer.gpu_count).is_integer()
+    return (offer.currency == currency and offer.gpu_count is not None and offer.gpu_count >= 1 and float(offer.gpu_count).is_integer()
             and offer.gpu_fraction == 1 and not offer.is_from_price and offer.tax_basis != "included"
             and offer.price_scope in {"instance", "per_gpu"}
             and offer.price_type in ("on_demand", "spot")
-            and region_class(offer.region) == "standard")
+            and region_class(offer.region) in {"standard", "unknown_region"})

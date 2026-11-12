@@ -6,7 +6,7 @@ import math
 import re
 from urllib.parse import urlsplit
 
-PRICE_TYPES = frozenset({"on_demand", "spot", "reserved_1y", "reserved_3y"})
+PRICE_TYPES = frozenset({"on_demand", "spot", "interruptible", "reserved", "reserved_1y", "reserved_3y"})
 
 
 def utc_now() -> str:
@@ -30,19 +30,19 @@ class Offer:
     provider: str
     sku: str
     gpu_model: str
-    gpu_count: float  # Physical GPU equivalents; may be fractional (e.g. A10 1/6).
+    gpu_count: float | None  # Explicit allocation; unknown is never inferred from billing.
     vcpu: int | None
     ram_gb: float | None  # Historical field name; values are GiB.
     region: str | None
     price_type: str
     currency: str
     price_per_hour: float
-    price_per_gpu_hour: float
+    price_per_gpu_hour: float | None
     source_url: str
     collected_at: str
     effective_start_date: str | None = None  # Unknown in older snapshots; never fabricate.
     price_scope: str = "instance"
-    gpu_fraction: float = 1.0
+    gpu_fraction: float | None = 1.0
     gpu_model_raw: str | None = None
     tax_basis: str = "unknown"
     is_from_price: bool = False
@@ -64,6 +64,12 @@ class Offer:
     cpu_raw: str | None = None
     ram_raw: str | None = None
     vram_raw: str | None = None
+    price_conditions: str | None = None
+    price_per_day: float | None = None  # Original whole-server Clore quote.
+    source_billing_unit: str | None = None
+    price_basis: str | None = None
+    fx_usd_per_eur: float | None = None
+    fx_original_per_eur: float | None = None
 
     def current_at(self, stamp: str) -> bool:
         now = parse_utc(stamp)
@@ -95,13 +101,13 @@ def validate_offer(offer: Offer) -> Offer:
         raise ValueError("vcpu must be a positive integer")
     for name in ("gpu_count", "ram_gb", "price_per_hour", "price_per_gpu_hour", "gpu_fraction"):
         value = getattr(offer, name)
-        if name == "ram_gb" and value is None:
+        if name in {"gpu_count", "ram_gb", "price_per_gpu_hour", "gpu_fraction"} and value is None:
             continue
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
             raise ValueError(f"{name} must be finite and positive")
     if offer.price_scope not in {"instance", "per_gpu", "gpu_component"}:
         raise ValueError("invalid price_scope")
-    if offer.gpu_fraction > 1 or offer.tax_basis not in {"excluded", "included", "unknown"}:
+    if (offer.gpu_fraction is not None and offer.gpu_fraction > 1) or offer.tax_basis not in {"excluded", "included", "unknown"}:
         raise ValueError("invalid GPU fraction or tax basis")
     if offer.tier not in {"A", "B", "C"} or (offer.export_allowed and offer.tier != "A"):
         raise ValueError("only tier A is exportable; tier D cannot be ingested")
@@ -111,15 +117,23 @@ def validate_offer(offer: Offer) -> Offer:
         raise ValueError("non-hourly prices require explicit normalization; monthly prices are refused")
     if offer.minimum_billing_seconds is not None and (type(offer.minimum_billing_seconds) is not int or offer.minimum_billing_seconds <= 0):
         raise ValueError("invalid minimum_billing_seconds")
-    expected = offer.price_per_hour / offer.gpu_count if offer.price_scope == "instance" else offer.price_per_hour
-    if not math.isclose(offer.price_per_gpu_hour, expected, rel_tol=1e-9, abs_tol=1e-12):
-        raise ValueError("price_per_gpu_hour must equal price_per_hour / gpu_count")
+    allocation = offer.gpu_count or (offer.gpu_fraction if offer.gpu_fraction is not None and offer.gpu_fraction < 1 else None)
+    expected = (offer.price_per_hour / allocation if allocation else None) if offer.price_scope == "instance" else offer.price_per_hour
+    if ((expected is None) != (offer.price_per_gpu_hour is None)
+            or expected is not None and not math.isclose(offer.price_per_gpu_hour, expected, rel_tol=1e-9, abs_tol=1e-12)):
+        raise ValueError("price_per_gpu_hour must match the explicit allocation and price scope")
     if not isinstance(offer.source_url, str) or any(ord(c) < 33 for c in offer.source_url):
         raise ValueError("source_url must be a public HTTPS URL")
     source = urlsplit(offer.source_url)
     if source.scheme != "https" or not source.hostname or source.username or source.password or source.port not in (None, 443):
         raise ValueError("source_url must be a public HTTPS URL without credentials")
     parse_utc(offer.collected_at)
+    if offer.provider == 'clore':
+        if (offer.source_billing_unit != 'instance-day' or not offer.price_basis
+                or offer.price_per_day is None or not math.isfinite(offer.price_per_day)
+                or offer.price_per_day <= 0 or offer.currency != 'USD'
+                or not math.isclose(offer.price_per_hour, offer.price_per_day / 24, rel_tol=1e-9)):
+            raise ValueError('invalid Clore daily price provenance')
     if offer.effective_start_date is not None:
         parse_utc(offer.effective_start_date)
     for value in (offer.effective_from, offer.effective_to, offer.availability_observed_at):

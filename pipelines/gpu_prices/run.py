@@ -15,8 +15,10 @@ from .providers.azure import AzureCollector
 from .providers.linode import LinodeCollector
 from .providers.scaleway import ScalewayCollector
 from .providers.verda import VerdaCollector
+from .providers.page_collector import PageCollector, PARSERS
+from .providers.clore_collector import CloreCollector
 from .fx import refresh, to_usd
-from .schema import utc_now
+from .schema import parse_utc, utc_now
 from .store import DEFAULT_DB, PriceStore, ROOT
 from .audit import audit_site, live_sample
 
@@ -41,16 +43,20 @@ def configure_logging() -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Collect verified public tier A GPU prices and build an offline static site.")
+    parser = argparse.ArgumentParser(description="Collect verified GPU prices (A exports; B/C display only) and build an offline static site.")
     parser.add_argument("command", choices=("collect", "build", "all", "deploy", "audit"))
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     parser.add_argument("--limit-pages", type=positive_int, default=None, help="Limit successful pages; coverage may be partial")
-    parser.add_argument("--provider", action="append", choices=("azure","linode","scaleway","verda"), help="Retry selected enabled providers; default collects all")
+    names = ("azure", "linode", "scaleway", "verda", "clore", *PARSERS)
+    parser.add_argument("--provider", action="append", choices=names, help="Collect selected enabled providers; default collects all; pages at most hourly")
     parser.add_argument("--site-base-url", help="Public HTTPS origin; overrides SITE_BASE_URL (default: placeholder https://example.pages.dev)")
+    parser.add_argument("--as-of", type=parse_utc, help="Build the exact snapshot at this UTC timestamp (build only)")
     parser.add_argument("--project", help="Cloudflare Pages project name (required for deploy)")
     parser.add_argument("--live-sample", type=positive_int, help="Audit N random stored Azure offers against the live API")
     args = parser.parse_args(argv)
+    if args.as_of and args.command != 'build':
+        parser.error('--as-of requires build')
     if args.live_sample and args.command != "audit":
         parser.error("--live-sample requires audit")
     if args.command == "deploy":
@@ -81,18 +87,24 @@ def main(argv: list[str] | None = None) -> int:
                     if summary["live_sample"]["status"] != "passed":
                         exit_code = 1
             if args.command in {"collect", "all"}:
-                selected = set(args.provider or ("azure","linode","scaleway","verda"))
-                rates, fx_status = refresh(args.db.parent / "ecb_rates.json") if 'scaleway' in selected else (None, 'not_required')
+                selected = set(args.provider or names)
+                rates, fx_status = refresh(args.db.parent / "ecb_rates.json") if selected & {'scaleway', 'featurize', 'baidu_gpu', 'anygpu', 'ai_galaxy'} else (None, 'not_required')
                 summary["fx"] = {"status": fx_status, "date": rates["date"] if rates else None}
                 collections = {}
-                for name, factory in (("azure", AzureCollector), ("linode", LinodeCollector), ("scaleway", ScalewayCollector), ("verda", VerdaCollector)):
+                factories = {"azure": AzureCollector, "linode": LinodeCollector, "scaleway": ScalewayCollector, "verda": VerdaCollector}
+                for name in names:
                     if name not in selected:
                         continue
-                    collector = factory()
+                    collector = (PageCollector(name, store=store) if name in PARSERS else
+                                 CloreCollector(store=store) if name == 'clore' else factories[name]())
                     started = utc_now()
                     timer = perf_counter()
                     try:
                         offers = collector.collect(limit_pages=args.limit_pages)
+                        if getattr(collector, "skipped", False):
+                            collections[name] = {"status": "skipped", "pages": 0, "records": 0,
+                                "reason": "page fetched within 60 minutes", "models": []}
+                            continue
                         offers = [to_usd(o, rates) for o in offers]
                         changed = store.upsert(offers)
                         status = "complete" if collector.complete else "limited"
@@ -113,7 +125,9 @@ def main(argv: list[str] | None = None) -> int:
                 summary["collections"] = collections
                 summary["collection"] = collections.get("azure", next(iter(collections.values())))
             if args.command in {"build", "all"}:
-                summary["build"] = build_site(store, args.out, site_base_url=args.site_base_url)
+                summary["build"] = build_site(store, args.out, site_base_url=args.site_base_url,
+                                             today=args.as_of.date().isoformat() if args.as_of else None,
+                                             built_at=args.as_of.isoformat() if args.as_of else None)
                 LOG.info("Static site built: %s", summary["build"])
     except (OSError, ValueError, HTTPException, sqlite3.Error) as exc:
         LOG.exception("Pipeline failed")
