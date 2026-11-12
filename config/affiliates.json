@@ -1,0 +1,19 @@
+{
+  "_comment": "Public referral/affiliate IDs (not secrets). Exported as AFFILIATE_<PROVIDER>_REF at build time.",
+  "vast": {
+    "ref_id": "858301",
+    "link_template": "https://cloud.vast.ai/?ref_id={ref_id}",
+    "program": "https://docs.vast.ai/guides/reference/referral-program",
+    "notes": "Link-only listing: Vast ToS forbids using its data for price comparison, so prices are not scraped. Referral promotion rules: no brand-keyword ad bidding, no trademark use in ad copy, single referral account only."
+  },
+  "surflare": {
+    "kind": "sponsor_referral",
+    "url": "https://www.surflare.com/referral/k1ws798s",
+    "label": "Surflare VPN",
+    "placement": "secondary partner card (below hero KPIs) + footer link; never above price data",
+    "disclosure": "Referral link; the site owner uses and recommends this service.",
+    "added": "2026-11-12",
+    "promo_code": "k1ws798s",
+    "terms_seen_2026_11_12": "Buyer gets 5% off with the code; referrer earns 20% of EVERY payment (recurring). Referrer and referee must be different users. Link auto-applies the code at checkout; cash only when the code is used at purchase. Suggested channels by Surflare: YouTube, Instagram, TikTok."
+  }
+}

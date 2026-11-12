@@ -1,0 +1,216 @@
+{
+  "request": {
+    "method": "GET",
+    "User-Agent": "Python-urllib/3.12",
+    "Accept": "text/html",
+    "cookies": false,
+    "authentication": false
+  },
+  "providers": {
+    "featurize": {
+      "url": "https://featurize.cn/vm/available",
+      "attempts": [
+        {
+          "at": "2026-11-12T13:24:09.849090+00:00",
+          "status": 200
+        }
+      ],
+      "status": 200,
+      "final_url": "https://featurize.cn/vm/available",
+      "fetched_at": "2026-11-12T13:24:09.849090+00:00",
+      "bytes": 120519,
+      "sha256": "08eff75c59621d9e9e3189beb19796f44b2b6311922a62963120ed94c02f9499",
+      "charset": "utf-8",
+      "outcome": "parsed",
+      "note": "Visible cards only, including CPU negative control. Omitted hydration script (physical host totals, internal IPs and metadata), navigation and SVG icons only if outside section.",
+      "fixture": "featurize.html",
+      "fixture_bytes": 66675,
+      "fixture_sha256": "afcc9f6b14788c15463ce0e1ba28a2b6fbdee89a29b9cb9163ea77ed76cb9850",
+      "row_count": 11
+    },
+    "nebius": {
+      "url": "https://nebius.com/prices",
+      "attempts": [
+        {
+          "at": "2026-11-12T13:24:09.849090+00:00",
+          "status": 200
+        }
+      ],
+      "status": 200,
+      "final_url": "https://nebius.com/prices",
+      "fetched_at": "2026-11-12T13:24:09.849090+00:00",
+      "bytes": 276566,
+      "sha256": "a9e4be8fc86319381bd81ea4a27476057ace5495043b6002960310e79aa9d580",
+      "charset": "utf-8",
+      "outcome": "parsed",
+      "note": "GPU table with dynamic spot, flat L40S preemptible and tax footnotes. CPU/storage prices and hydration omitted.",
+      "fixture": "nebius.html",
+      "fixture_bytes": 10749,
+      "fixture_sha256": "bc1126ab842a3538c54286941da4eb6af0a5bef36c908bd7365da64dab22780f",
+      "row_count": 14
+    },
+    "lambda_": {
+      "url": "https://lambda.com/pricing",
+      "attempts": [
+        {
+          "at": "2026-11-12T13:24:09.849090+00:00",
+          "status": 200
+        }
+      ],
+      "status": 200,
+      "final_url": "https://lambda.com/pricing",
+      "fetched_at": "2026-11-12T13:24:09.849090+00:00",
+      "bytes": 88772,
+      "sha256": "3a277b420f1deba0cd83020467aeb9f7df0eb4ee4534866661f42bf59eb077fa",
+      "charset": "utf-8",
+      "outcome": "parsed",
+      "note": "Instances section including all 8x/4x/2x/1x tabs, tax and future effective-date footnotes; committed cluster section retained as negative control.",
+      "fixture": "lambda_.html",
+      "fixture_bytes": 17361,
+      "fixture_sha256": "974752bb43265af4542f69461973f310124862f78eecd1baa89ce3f38f86ed70",
+      "row_count": 22
+    },
+    "runpod": {
+      "url": "https://www.runpod.io/pricing",
+      "attempts": [
+        {
+          "at": "2026-11-12T13:24:09.850086+00:00",
+          "status": 403,
+          "error": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "status": "blocked",
+      "outcome": "blocked",
+      "http_status": 403,
+      "fetched_at": "2026-11-12T13:24:09.850086+00:00",
+      "sha256": "3ed1ea470bf3bac51815e1636261b655ff32603d6f098792791c2a1523627750",
+      "note": "Plain GET returned HTTP 403. Stopped per spec; no retry, cookies, browser impersonation, login, or private API fallback. Fixture contains only error headings.",
+      "fixture": "runpod.blocked.html",
+      "fixture_bytes": 882,
+      "fixture_sha256": "812c29ec547ffb1fa1f6ab6aef01dd534b413ffd6e8cfbb2df993d4d782e2143",
+      "row_count": 0
+    },
+    "digitalocean_gpu": {
+      "url": "https://www.digitalocean.com/pricing/gpu-droplets",
+      "attempts": [
+        {
+          "at": "2026-11-12T13:24:09.850086+00:00",
+          "status": 403,
+          "error": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "status": "blocked",
+      "outcome": "blocked",
+      "http_status": 403,
+      "fetched_at": "2026-11-12T13:24:09.850086+00:00",
+      "sha256": "8ff647991549f77f1bc4b75f0f0ba005cd172ce526f770a378ae0c68ad11dbfa",
+      "note": "Plain GET returned HTTP 403. Stopped per spec; no retry, cookies, browser impersonation, login, or private API fallback. Fixture contains only error headings.",
+      "fixture": "digitalocean_gpu.blocked.html",
+      "fixture_bytes": 114,
+      "fixture_sha256": "021c57a109e8a7493926575d2ba8d1eb7c2a7df8692c58aed250ef5b74fd13e2",
+      "row_count": 0
+    },
+    "paperspace": {
+      "url": "https://www.paperspace.com/pricing",
+      "attempts": [
+        {
+          "at": "2026-11-12T13:24:09.907501+00:00",
+          "status": 200
+        }
+      ],
+      "status": 200,
+      "final_url": "https://www.paperspace.com/pricing",
+      "fetched_at": "2026-11-12T13:24:09.907501+00:00",
+      "bytes": 127225,
+      "sha256": "f55fdd9f941c8f338cfb08a1f27f4c7567e2667f86112d3dbeed45da66d9f3fe",
+      "charset": "utf-8",
+      "outcome": "parsed",
+      "note": "Hourly and monthly tabs retain hidden stale price, VDI, CPU and multi-GPU markup as negative controls. Only visible hourly GPU compute cards and explicit H100 promo footnote are parsed.",
+      "fixture": "paperspace.html",
+      "fixture_bytes": 45614,
+      "fixture_sha256": "3a41ac2435237df1c0cf4b655124a5014847990172ff1cb2aa20b62dc949407a",
+      "row_count": 13
+    },
+    "salad": {
+      "url": "https://salad.com/pricing/",
+      "attempts": [
+        {
+          "at": "2026-11-12T13:24:10.245735+00:00",
+          "status": 403,
+          "error": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "status": "blocked",
+      "outcome": "blocked",
+      "http_status": 403,
+      "fetched_at": "2026-11-12T13:24:10.245735+00:00",
+      "sha256": "dc51efdd09c75ca7415f6c00f97a8b15ded33509924603c79093eff564b2f570",
+      "note": "Plain GET returned HTTP 403. Stopped per spec; no retry, cookies, browser impersonation, login, or private API fallback. Fixture contains only error headings.",
+      "fixture": "salad.blocked.html",
+      "fixture_bytes": 874,
+      "fixture_sha256": "8ef31d6c195675f16a5f8853677545f49ddaf324398868f0784c4bbc38851096",
+      "row_count": 0
+    },
+    "thunder": {
+      "url": "https://www.thundercompute.com/pricing",
+      "attempts": [
+        {
+          "at": "2026-11-12T13:24:10.245735+00:00",
+          "status": 403,
+          "error": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "status": "blocked",
+      "outcome": "blocked",
+      "http_status": 403,
+      "fetched_at": "2026-11-12T13:24:10.245735+00:00",
+      "sha256": "d309acb32ba01cf0a809b0d8d1178bb569c2e3ee3a3ccd654625be26ae1c5de9",
+      "note": "Plain GET returned HTTP 403. Stopped per spec; no retry, cookies, browser impersonation, login, or private API fallback. Fixture contains only error headings.",
+      "fixture": "thunder.blocked.html",
+      "fixture_bytes": 900,
+      "fixture_sha256": "045cc0df1d5b2a354f89f764f10dbce8403b60712f004f991a49b4c312b6f9b9",
+      "row_count": 0
+    },
+    "massedcompute": {
+      "url": "https://vm.massedcompute.com/pricing",
+      "attempts": [
+        {
+          "at": "2026-11-12T13:24:10.245735+00:00",
+          "status": 403,
+          "error": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "status": "blocked",
+      "outcome": "blocked",
+      "http_status": 403,
+      "fetched_at": "2026-11-12T13:24:10.245735+00:00",
+      "sha256": "82b68e62564b06b9673b7f50b939fe338c420cb3fdd5966f8b8a2ad50306fd86",
+      "note": "Plain GET returned HTTP 403. Stopped per spec; no retry, cookies, browser impersonation, login, or private API fallback. Fixture contains only error headings.",
+      "fixture": "massedcompute.blocked.html",
+      "fixture_bytes": 896,
+      "fixture_sha256": "3cc2c42b929626aba15ed9be7f404f0cdfb6e682b5745212773046b7e0b0c944",
+      "row_count": 0
+    },
+    "baidu_gpu": {
+      "url": "https://cloud.baidu.com/product-price/gpu.html",
+      "attempts": [
+        {
+          "at": "2026-11-12T13:24:10.245735+00:00",
+          "status": 200
+        }
+      ],
+      "status": 200,
+      "final_url": "https://cloud.baidu.com/product-price/gpu.html",
+      "fetched_at": "2026-11-12T13:24:10.245735+00:00",
+      "bytes": 75193,
+      "sha256": "4f559a57f92e36ab1158164d23f90e0dd551a6a5ab6e64e32b5687b35f08bec5",
+      "charset": "utf-8",
+      "outcome": "parsed",
+      "note": "All four GPU specification tables, including prepaid columns as negative controls; parser selects only the post-paid hourly column by header.",
+      "fixture": "baidu_gpu.html",
+      "fixture_bytes": 8641,
+      "fixture_sha256": "3b36a239de97494e8e36b85b5d47b45674f1db2f829d46f587ade41a3de2233b",
+      "row_count": 31
+    }
+  }
+}

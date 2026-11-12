@@ -1,0 +1,469 @@
+<!doctype html>
+<meta charset="utf-8">
+<table>
+<thead>
+<tr>
+<th>实例规格</th>
+<th>GPU</th>
+<th>GPU显存</th>
+<th>CPU</th>
+<th>内存</th>
+<th>后付费（元/小时）</th>
+<th>预付费（元/月）</th>
+<th>预付费（元/年）8.3折</th>
+<th>预付费（元/2年）7折</th>
+<th>预付费（元/3年）5折 </th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>bcc.gn5.c14m120.1A100-80g</td>
+<td>1*Nvidia A100 Nvswitch-80g</td>
+<td>80GB</td>
+<td>14核</td>
+<td>120GB</td>
+<td>30.18</td>
+<td>14485.91</td>
+<td>144279.63</td>
+<td>243363.24</td>
+<td>260746.32 </td>
+</tr>
+<tr>
+<td>bcc.gn5.c28m240.2A100-80g</td>
+<td>2*Nvidia A100 Nvswitch-80g</td>
+<td>160GB</td>
+<td>28核</td>
+<td>240GB</td>
+<td>60.36</td>
+<td>28971.81</td>
+<td>288559.27</td>
+<td>486726.47</td>
+<td>521492.65 </td>
+</tr>
+<tr>
+<td>bcc.gn5.c56m480.4A100-80g</td>
+<td>4*Nvidia A100 Nvswitch-80g</td>
+<td>320GB</td>
+<td>56核</td>
+<td>480GB</td>
+<td>120.72</td>
+<td>57943.63</td>
+<td>577118.53</td>
+<td>973452.95</td>
+<td>1042985.30 </td>
+</tr>
+<tr>
+<td>bcc.gn5.c112m960.8A100-80g</td>
+<td>8*Nvidia A100 Nvswitch-80g</td>
+<td>640GB</td>
+<td>112核</td>
+<td>960GB</td>
+<td>241.43</td>
+<td>115887.26</td>
+<td>1154237.06</td>
+<td>1946905.89</td>
+<td>2085970.60 </td>
+</tr>
+<tr>
+<td>bcc.gn5.c112m896.8A100-40g</td>
+<td>8*Nvidia A100 Nvswitch-40g</td>
+<td>320GB</td>
+<td>112核</td>
+<td>896GB</td>
+<td>208.67</td>
+<td>100162.38</td>
+<td>997617.30</td>
+<td>1682727.98</td>
+<td>1802922.84 </td>
+</tr>
+<tr>
+<td>bcc.gn5.c16m64.1a10</td>
+<td>1*Nvidia A10 PCIE</td>
+<td>24GB</td>
+<td>16核</td>
+<td>64GB</td>
+<td>9.10</td>
+<td>4369.85</td>
+<td>43523.72</td>
+<td>73413.50</td>
+<td>78657.32 </td>
+</tr>
+<tr>
+<td>bcc.gn5.c32m128.2a10</td>
+<td>2*Nvidia A10 PCIE</td>
+<td>48GB</td>
+<td>32核</td>
+<td>128GB</td>
+<td>18.21</td>
+<td>8739.70</td>
+<td>87047.44</td>
+<td>146827.00</td>
+<td>157314.65 </td>
+</tr>
+<tr>
+<td>bcc.gn5.c64m256.4a10</td>
+<td>4*Nvidia A10 PCIE</td>
+<td>96GB</td>
+<td>64核</td>
+<td>256GB</td>
+<td>36.42</td>
+<td>17479.41</td>
+<td>174094.87</td>
+<td>293654.01</td>
+<td>314629.29 </td>
+</tr>
+<tr>
+<td>bcc.gn5.c28m112.1a10</td>
+<td>1*Nvidia A10 PCIE</td>
+<td>24GB</td>
+<td>28核</td>
+<td>112GB</td>
+<td>10.98</td>
+<td>5270.00</td>
+<td>52489.20</td>
+<td>88535.99</td>
+<td>94859.99 </td>
+</tr>
+<tr>
+<td>bcc.gn5.c56m224.2a10</td>
+<td>2*Nvidia A10 PCIE</td>
+<td>48GB</td>
+<td>56核</td>
+<td>224GB</td>
+<td>21.96</td>
+<td>10540.00</td>
+<td>104978.39</td>
+<td>177071.99</td>
+<td>189719.99 </td>
+</tr>
+<tr>
+<td>bcc.gn5.c112m476.4a10</td>
+<td>4*Nvidia A10 PCIE</td>
+<td>96GB</td>
+<td>112核</td>
+<td>476GB</td>
+<td>44.18</td>
+<td>21206.00</td>
+<td>211211.76</td>
+<td>356260.79</td>
+<td>381707.99 </td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>实例规格</th>
+<th>GPU</th>
+<th>GPU显存</th>
+<th>CPU</th>
+<th>内存</th>
+<th>本地磁盘</th>
+<th>后付费</th>
+<th>预付费</th>
+<th>预付费（1年，8.3折）</th>
+<th>预付费（2年，7折）</th>
+<th>预付费（3年，5折）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>bcc.gn3.c10m80.1v100-32g</td>
+<td>1 * NVIDIA Tesla V100-32G</td>
+<td>32GB</td>
+<td>10核</td>
+<td>80GB</td>
+<td>—</td>
+<td>15.52元/小时</td>
+<td>7448.33元/月</td>
+<td>74185.41元/年</td>
+<td>125132.02元/2年</td>
+<td>134070.03元/3年</td>
+</tr>
+<tr>
+<td>bcc.gn3.c20m160.2v100-32g</td>
+<td>2 * NVIDIA Tesla V100-32G</td>
+<td>64GB</td>
+<td>20核</td>
+<td>160GB</td>
+<td>—</td>
+<td>31.03元/小时</td>
+<td>14896.67元/月</td>
+<td>148370.83元/年</td>
+<td>250264.05元/1年</td>
+<td>268140.05元/3年</td>
+</tr>
+<tr>
+<td>bcc.gn3.c40m320.4v100-32g</td>
+<td>4 * NVIDIA Tesla V100-32G</td>
+<td>128GB</td>
+<td>40核</td>
+<td>320GB</td>
+<td>—</td>
+<td>62.07元/小时</td>
+<td>29793.34元/月</td>
+<td>296741.65元/年</td>
+<td>500528.09元/2年</td>
+<td>536280.10元/3年</td>
+</tr>
+<tr>
+<td>bcc.gn3.c80m640.8v100-32g</td>
+<td>8 * NVIDIA Tesla V100-32G</td>
+<td>256GB</td>
+<td>80核</td>
+<td>640GB</td>
+<td>—</td>
+<td>124.14元/小时</td>
+<td>59586.68元/月</td>
+<td>593483.31元/年</td>
+<td>1001056.18元/2年</td>
+<td>1072560.20元/3年</td>
+</tr>
+<tr>
+<td>bcc.gn3.c20m80.1t4</td>
+<td>1 * NVIDIA Tesla T4</td>
+<td>16GB</td>
+<td>20核</td>
+<td>80GB</td>
+<td>—</td>
+<td>8.30 元/小时</td>
+<td>3985.01 元/月</td>
+<td>39690.70 元/年</td>
+<td>66948.17 元/2年</td>
+<td>71730.18 元/3年</td>
+</tr>
+<tr>
+<td>bcc.gn3.c40m160.2t4</td>
+<td>2 * NVIDIA Tesla T4</td>
+<td>32GB</td>
+<td>40核</td>
+<td>160GB</td>
+<td>—</td>
+<td>16.60 元/小时</td>
+<td>7970.02 元/月</td>
+<td>79381.40 元/年</td>
+<td>133896.33 元/2年</td>
+<td>143460.354 元/3年</td>
+</tr>
+<tr>
+<td>bcc.gn3.c80m320.4t4</td>
+<td>4 * NVIDIA Tesla T4</td>
+<td>64GB</td>
+<td>80核</td>
+<td>320GB</td>
+<td>—</td>
+<td>33.21 元/小时</td>
+<td>15940.04 元/月</td>
+<td>158762.79 元/年</td>
+<td>267792.66 元/2年</td>
+<td>286920.71 元/3年</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>实例规格</th>
+<th>GPU</th>
+<th>GPU显存</th>
+<th>CPU</th>
+<th>内存</th>
+<th>磁盘</th>
+<th>后付费</th>
+<th>预付费</th>
+<th>预付费（1年，8.3折）</th>
+<th>预付费（2年，7折）</th>
+<th>预付费（3年，5折）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>bcc.vgn3.c2m12.1v100-32g-8C</td>
+<td>1/4 * NVIDIA Tesla V100</td>
+<td>8GB</td>
+<td>2核</td>
+<td>12GB</td>
+<td>-</td>
+<td>3.41元/小时</td>
+<td>1639元/月</td>
+<td>16333/年</td>
+<td>27549元/2年</td>
+<td>29517元/3年</td>
+</tr>
+<tr>
+<td>bcc.vgn3.c4m24.1v100-32g-16C</td>
+<td>1/2 * NVIDIA Tesla V100</td>
+<td>16GB</td>
+<td>4核</td>
+<td>24GB</td>
+<td>-</td>
+<td>6.83/小时</td>
+<td>3279元/月</td>
+<td>32666元/年</td>
+<td>55099元/2年</td>
+<td>59035元/3年</td>
+</tr>
+<tr>
+<td>bcc.vgn3.c4m16.1t4-4C</td>
+<td>1/4 * NVIDIA Tesla T4</td>
+<td>4GB</td>
+<td>4核</td>
+<td>16GB</td>
+<td>-</td>
+<td>1.74元/小时</td>
+<td>839元/月</td>
+<td>8360/年</td>
+<td>14101元/2年</td>
+<td>15108元/3年</td>
+</tr>
+<tr>
+<td>bcc.vgn3.c10m40.1t4-8C</td>
+<td>1/2 * NVIDIA Tesla T4</td>
+<td>8GB</td>
+<td>10核</td>
+<td>40GB</td>
+<td>-</td>
+<td>3.92/小时</td>
+<td>1884元/月</td>
+<td>18774元/年</td>
+<td>31667元/2年</td>
+<td>33929元/3年</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>实例规格</th>
+<th>GPU</th>
+<th>GPU显存</th>
+<th>CPU</th>
+<th>内存</th>
+<th>本地磁盘</th>
+<th>后付费</th>
+<th>预付费</th>
+<th>预付费（1年，8.3折）</th>
+<th>预付费（2年，7折）</th>
+<th>预付费（3年，5折）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>bcc.lgn1.c12m40.1p40</td>
+<td>1 * NVIDIA Tesla P40</td>
+<td>24GB</td>
+<td>12核</td>
+<td>40GB</td>
+<td>450GB</td>
+<td>8.37元/小时</td>
+<td>4017元/月</td>
+<td>40009.32元/年</td>
+<td>67485.6元/2年</td>
+<td>72306元/3年</td>
+</tr>
+<tr>
+<td>bcc.lgn1.c24m80.2p40</td>
+<td>2 * NVIDIA Tesla P40</td>
+<td>48GB</td>
+<td>24核</td>
+<td>80GB</td>
+<td>900GB</td>
+<td>16.74元/小时</td>
+<td>8034元/月</td>
+<td>80018.64元/年</td>
+<td>134971.2元/2年</td>
+<td>144612元/3年</td>
+</tr>
+<tr>
+<td>bcc.lgn1.c48m160.4p40</td>
+<td>4 * NVIDIA Tesla P40</td>
+<td>96GB</td>
+<td>48核</td>
+<td>160GB</td>
+<td>1800GB</td>
+<td>33.48元/小时</td>
+<td>16068元/月</td>
+<td>160037.28元/年</td>
+<td>269942.4元/2年</td>
+<td>289224元/3年</td>
+</tr>
+<tr>
+<td>bcc.lgn1.c12m40.1p4</td>
+<td>1 * NVIDIA Tesla P4</td>
+<td>8GB</td>
+<td>12核</td>
+<td>40GB</td>
+<td>450GB</td>
+<td>6.00元/小时</td>
+<td>2880元/月</td>
+<td>28684.8元/年</td>
+<td>48384元/2年</td>
+<td>51840元/3年</td>
+</tr>
+<tr>
+<td>bcc.lgn1.c24m80.2p4</td>
+<td>2 * NVIDIA Tesla P4</td>
+<td>16GB</td>
+<td>24核</td>
+<td>80GB</td>
+<td>900GB</td>
+<td>12.00元/小时</td>
+<td>5760元/月</td>
+<td>57369.6元/年</td>
+<td>96768元/2年</td>
+<td>103680元/3年</td>
+</tr>
+<tr>
+<td>bcc.lgn1.c48m160.4p4</td>
+<td>4 * NVIDIA Tesla P4</td>
+<td>32GB</td>
+<td>48核</td>
+<td>160GB</td>
+<td>1800GB</td>
+<td>24.00元/小时</td>
+<td>11520元/月</td>
+<td>114739.2元/年</td>
+<td>193536元/2年</td>
+<td>207360元/3年</td>
+</tr>
+<tr>
+<td>bcc.lgn1.c6m40.1k40</td>
+<td>1 * NVIDIA Tesla K40</td>
+<td>12GB</td>
+<td>6核</td>
+<td>40GB</td>
+<td>200GB</td>
+<td>6.56元/小时</td>
+<td>3150元/月</td>
+<td>31374元/年</td>
+<td>52920元/2年</td>
+<td>56700元/3年</td>
+</tr>
+<tr>
+<td>bcc.lgn1.c12m80.2k40</td>
+<td>2 * NVIDIA Tesla K40</td>
+<td>24GB</td>
+<td>12核</td>
+<td>80GB</td>
+<td>400GB</td>
+<td>13.13元/小时</td>
+<td>6300元/月</td>
+<td>62748元/年</td>
+<td>105840元/2年</td>
+<td>113400元/3年</td>
+</tr>
+<tr>
+<td>bcc.lgn1.c24m160.4k40</td>
+<td>4 * NVIDIA Tesla K40</td>
+<td>48GB</td>
+<td>24核</td>
+<td>160GB</td>
+<td>800GB</td>
+<td>26.25元/小时</td>
+<td>12600元/月</td>
+<td>125496元/年</td>
+<td>211680元/2年</td>
+<td>226800元/3年</td>
+</tr>
+</tbody>
+</table>

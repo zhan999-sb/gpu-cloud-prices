@@ -1,0 +1,704 @@
+{
+  "checked_at": "2026-11-12",
+  "linode": {
+    "g1-gpu-rtx6000-1": {
+      "model": "Quadro RTX 6000 24GB",
+      "count": 1,
+      "source": "https://www.akamai.com/cloud/pricing/gpu"
+    },
+    "g1-gpu-rtx6000-2": {
+      "model": "Quadro RTX 6000 24GB",
+      "count": 2,
+      "source": "https://www.akamai.com/cloud/pricing/gpu"
+    },
+    "g1-gpu-rtx6000-3": {
+      "model": "Quadro RTX 6000 24GB",
+      "count": 3,
+      "source": "https://www.akamai.com/cloud/pricing/gpu"
+    },
+    "g1-gpu-rtx6000-4": {
+      "model": "Quadro RTX 6000 24GB",
+      "count": 4,
+      "source": "https://www.akamai.com/cloud/pricing/gpu"
+    },
+    "g2-gpu-rtx4000a1-s": {
+      "model": "RTX 4000 Ada 20GB",
+      "count": 1,
+      "source": "https://www.akamai.com/cloud/pricing/gpu"
+    },
+    "g2-gpu-rtx4000a1-m": {
+      "model": "RTX 4000 Ada 20GB",
+      "count": 1,
+      "source": "https://www.akamai.com/cloud/pricing/gpu"
+    },
+    "g2-gpu-rtx4000a1-l": {
+      "model": "RTX 4000 Ada 20GB",
+      "count": 1,
+      "source": "https://www.akamai.com/cloud/pricing/gpu"
+    },
+    "g2-gpu-rtx4000a1-xl": {
+      "model": "RTX 4000 Ada 20GB",
+      "count": 1,
+      "source": "https://www.akamai.com/cloud/pricing/gpu"
+    },
+    "g2-gpu-rtx4000a2-s": {
+      "model": "RTX 4000 Ada 20GB",
+      "count": 2,
+      "source": "https://www.akamai.com/cloud/pricing/gpu"
+    },
+    "g2-gpu-rtx4000a2-m": {
+      "model": "RTX 4000 Ada 20GB",
+      "count": 2,
+      "source": "https://www.akamai.com/cloud/pricing/gpu"
+    },
+    "g2-gpu-rtx4000a2-hs": {
+      "model": "RTX 4000 Ada 20GB",
+      "count": 2,
+      "source": "https://www.akamai.com/cloud/pricing/gpu"
+    },
+    "g2-gpu-rtx4000a4-s": {
+      "model": "RTX 4000 Ada 20GB",
+      "count": 4,
+      "source": "https://www.akamai.com/cloud/pricing/gpu"
+    },
+    "g2-gpu-rtx4000a4-m": {
+      "model": "RTX 4000 Ada 20GB",
+      "count": 4,
+      "source": "https://www.akamai.com/cloud/pricing/gpu"
+    }
+  },
+  "verda": {
+    "1GB300.32V": {
+      "model": "GB300 SXM6 288GB",
+      "count": 1,
+      "raw": "1x GB300 SXM6 288GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "2GB300.64V": {
+      "model": "GB300 SXM6 288GB",
+      "count": 2,
+      "raw": "2x GB300 SXM6 288GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "4GB300.128V": {
+      "model": "GB300 SXM6 288GB",
+      "count": 4,
+      "raw": "4x GB300 SXM6 288GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "1B300.30V": {
+      "model": "B300 SXM6 268GB",
+      "count": 1,
+      "raw": "1x B300 SXM6 268GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "2B300.60V": {
+      "model": "B300 SXM6 268GB",
+      "count": 2,
+      "raw": "2x B300 SXM6 268GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "4B300.120V": {
+      "model": "B300 SXM6 268GB",
+      "count": 4,
+      "raw": "4x B300 SXM6 268GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "8B300.240V": {
+      "model": "B300 SXM6 268GB",
+      "count": 8,
+      "raw": "8x B300 SXM6 268GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "1B200.30V": {
+      "model": "B200 SXM6 180GB",
+      "count": 1,
+      "raw": "1x B200 SXM6 180GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "2B200.60V": {
+      "model": "B200 SXM6 180GB",
+      "count": 2,
+      "raw": "2x B200 SXM6 180GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "4B200.120V": {
+      "model": "B200 SXM6 180GB",
+      "count": 4,
+      "raw": "4x B200 SXM6 180GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "8B200.240V": {
+      "model": "B200 SXM6 180GB",
+      "count": 8,
+      "raw": "8x B200 SXM6 180GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "1H200.141S.44V": {
+      "model": "H200 SXM5 141GB",
+      "count": 1,
+      "raw": "1x H200 SXM5 141GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "2H200.141S.88V": {
+      "model": "H200 SXM5 141GB",
+      "count": 2,
+      "raw": "2x H200 SXM5 141GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "4H200.141S.176V": {
+      "model": "H200 SXM5 141GB",
+      "count": 4,
+      "raw": "4x H200 SXM5 141GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "8H200.141S.176V": {
+      "model": "H200 SXM5 141GB",
+      "count": 8,
+      "raw": "8x H200 SXM5 141GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "1H100.80S.30V": {
+      "model": "H100 SXM 80GB",
+      "count": 1,
+      "raw": "1x H100 SXM5 80GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "1H100.80S.32V": {
+      "model": "H100 SXM 80GB",
+      "count": 1,
+      "raw": "1x H100 SXM5 80GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "2H100.80S.80V": {
+      "model": "H100 SXM 80GB",
+      "count": 2,
+      "raw": "2x H100 SXM5 80GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "4H100.80S.176V": {
+      "model": "H100 SXM 80GB",
+      "count": 4,
+      "raw": "4x H100 SXM5 80GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "8H100.80S.176V": {
+      "model": "H100 SXM 80GB",
+      "count": 8,
+      "raw": "8x H100 SXM5 80GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "1A100.22V": {
+      "model": "A100 SXM4 80GB",
+      "count": 1,
+      "raw": "1x A100 SXM4 80GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "2A100.44V": {
+      "model": "A100 SXM4 80GB",
+      "count": 2,
+      "raw": "2x A100 SXM4 80GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "4A100.88V": {
+      "model": "A100 SXM4 80GB",
+      "count": 4,
+      "raw": "4x A100 SXM4 80GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "8A100.176V": {
+      "model": "A100 SXM4 80GB",
+      "count": 8,
+      "raw": "8x A100 SXM4 80GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "1A100.40S.22V": {
+      "model": "A100 SXM4 40GB",
+      "count": 1,
+      "raw": "1x A100 SXM4 40GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "8A100.40S.176V": {
+      "model": "A100 SXM4 40GB",
+      "count": 8,
+      "raw": "8x A100 SXM4 40GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "1V100.4V": {
+      "model": "V100 16GB",
+      "count": 1,
+      "raw": "1x Tesla V100 16GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "2V100.10V": {
+      "model": "V100 16GB",
+      "count": 2,
+      "raw": "2x Tesla V100 16GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "4V100.20V": {
+      "model": "V100 16GB",
+      "count": 4,
+      "raw": "4x Tesla V100 16GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "8V100.40V": {
+      "model": "V100 16GB",
+      "count": 8,
+      "raw": "8x Tesla V100 16GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "1RTXPRO6000.30V": {
+      "model": "RTX PRO 6000 96GB",
+      "count": 1,
+      "raw": "1x RTX PRO 6000 96GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "2RTXPRO6000.60V": {
+      "model": "RTX PRO 6000 96GB",
+      "count": 2,
+      "raw": "2x RTX PRO 6000 96GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "4RTXPRO6000.120V": {
+      "model": "RTX PRO 6000 96GB",
+      "count": 4,
+      "raw": "4x RTX PRO 6000 96GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "8RTXPRO6000.240V": {
+      "model": "RTX PRO 6000 96GB",
+      "count": 8,
+      "raw": "8x RTX PRO 6000 96GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "1L40S.20V": {
+      "model": "L40S 48GB",
+      "count": 1,
+      "raw": "1x L40S 48GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "2L40S.40V": {
+      "model": "L40S 48GB",
+      "count": 2,
+      "raw": "2x L40S 48GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "4L40S.80V": {
+      "model": "L40S 48GB",
+      "count": 4,
+      "raw": "4x L40S 48GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "8L40S.160V": {
+      "model": "L40S 48GB",
+      "count": 8,
+      "raw": "8x L40S 48GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "1RTX6000ADA.10V": {
+      "model": "RTX 6000 Ada 48GB",
+      "count": 1,
+      "raw": "1x RTX 6000 Ada 48GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "2RTX6000ADA.20V": {
+      "model": "RTX 6000 Ada 48GB",
+      "count": 2,
+      "raw": "2x RTX 6000 Ada 48GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "4RTX6000ADA.40V": {
+      "model": "RTX 6000 Ada 48GB",
+      "count": 4,
+      "raw": "4x RTX 6000 Ada 48GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "8RTX6000ADA.80V": {
+      "model": "RTX 6000 Ada 48GB",
+      "count": 8,
+      "raw": "8x RTX 6000 Ada 48GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "1A6000.10V": {
+      "model": "RTX A6000 48GB",
+      "count": 1,
+      "raw": "1x RTX A6000 48GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "2A6000.20V": {
+      "model": "RTX A6000 48GB",
+      "count": 2,
+      "raw": "2x RTX A6000 48GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "4A6000.40V": {
+      "model": "RTX A6000 48GB",
+      "count": 4,
+      "raw": "4x RTX A6000 48GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "8A6000.80V": {
+      "model": "RTX A6000 48GB",
+      "count": 8,
+      "raw": "8x RTX A6000 48GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "1RTXPRO6000.30V.CC": {
+      "model": "RTX PRO 6000 CC 96GB",
+      "count": 1,
+      "raw": "1x RTX PRO 6000 CC 96GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "4B300.120V.CC.AMD": {
+      "model": "B300 CC SXM6 268GB",
+      "count": 4,
+      "raw": "4x B300 CC SXM6 268GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "4B300.120V.CC.INTEL": {
+      "model": "B300 CC SXM6 268GB",
+      "count": 4,
+      "raw": "4x B300 CC SXM6 268GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "8B300.240V.CC.AMD": {
+      "model": "B300 CC SXM6 268GB",
+      "count": 8,
+      "raw": "8x B300 CC SXM6 268GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "8B300.240V.CC.INTEL": {
+      "model": "B300 CC SXM6 268GB",
+      "count": 8,
+      "raw": "8x B300 CC SXM6 268GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "2B200.60V.CC.INTEL": {
+      "model": "B200 CC SXM6 180GB",
+      "count": 2,
+      "raw": "2x B200 CC SXM6 180GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "2B200.60V.CC.AMD": {
+      "model": "B200 CC SXM6 180GB",
+      "count": 2,
+      "raw": "2x B200 CC SXM6 180GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "4B200.120V.CC.AMD": {
+      "model": "B200 CC SXM6 180GB",
+      "count": 4,
+      "raw": "4x B200 CC SXM6 180GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "4B200.120V.CC.INTEL": {
+      "model": "B200 CC SXM6 180GB",
+      "count": 4,
+      "raw": "4x B200 CC SXM6 180GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "8B200.240V.CC.AMD": {
+      "model": "B200 CC SXM6 180GB",
+      "count": 8,
+      "raw": "8x B200 CC SXM6 180GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    },
+    "8B200.240V.CC.INTEL": {
+      "model": "B200 CC SXM6 180GB",
+      "count": 8,
+      "raw": "8x B200 CC SXM6 180GB",
+      "source": "https://api.verda.com/v1/instance-types",
+      "spec_source": "https://verda.com/pricing"
+    }
+  },
+  "scaleway": {
+    "/instance/server/b300_sxm_8_288g/fr-par-2": {
+      "model": "B300 SXM 288GB",
+      "count": 8,
+      "raw": "B300-SXM",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/rtx6000b_4_96g/fr-par-2": {
+      "model": "RTX PRO 6000 Blackwell 96GB",
+      "count": 4,
+      "raw": "RTX6000-Blackwell",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/rtx6000b_2_96g/fr-par-2": {
+      "model": "RTX PRO 6000 Blackwell 96GB",
+      "count": 2,
+      "raw": "RTX6000-Blackwell",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/rtx6000b_1_96g/fr-par-2": {
+      "model": "RTX PRO 6000 Blackwell 96GB",
+      "count": 1,
+      "raw": "RTX6000-Blackwell",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/h100_sxm_8_80g/fr-par-2": {
+      "model": "H100 SXM 80GB",
+      "count": 8,
+      "raw": "H100-SXM",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/h100_sxm_4_80g/fr-par-2": {
+      "model": "H100 SXM 80GB",
+      "count": 4,
+      "raw": "H100-SXM",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/h100_sxm_2_80g/fr-par-2": {
+      "model": "H100 SXM 80GB",
+      "count": 2,
+      "raw": "H100-SXM",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/h100_2_80g/fr-par-2": {
+      "model": "H100 PCIe 80GB",
+      "count": 2,
+      "raw": "H100-PCIe",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/h100_2_80g/pl-waw-2": {
+      "model": "H100 PCIe 80GB",
+      "count": 2,
+      "raw": "H100-PCIe",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/h100_1_80g/fr-par-2": {
+      "model": "H100 PCIe 80GB",
+      "count": 1,
+      "raw": "H100-PCIe",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/h100_1_80g/pl-waw-2": {
+      "model": "H100 PCIe 80GB",
+      "count": 1,
+      "raw": "H100-PCIe",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/l40s_8_48g/fr-par-2": {
+      "model": "L40S 48GB",
+      "count": 8,
+      "raw": "L40S",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/l40s_8_48g/pl-waw-2": {
+      "model": "L40S 48GB",
+      "count": 8,
+      "raw": "L40S",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/l40s_4_48g/fr-par-2": {
+      "model": "L40S 48GB",
+      "count": 4,
+      "raw": "L40S",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/l40s_4_48g/pl-waw-2": {
+      "model": "L40S 48GB",
+      "count": 4,
+      "raw": "L40S",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/l40s_2_48g/fr-par-2": {
+      "model": "L40S 48GB",
+      "count": 2,
+      "raw": "L40S",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/l40s_2_48g/pl-waw-2": {
+      "model": "L40S 48GB",
+      "count": 2,
+      "raw": "L40S",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/l40s_1_48g/fr-par-2": {
+      "model": "L40S 48GB",
+      "count": 1,
+      "raw": "L40S",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/l40s_1_48g/pl-waw-2": {
+      "model": "L40S 48GB",
+      "count": 1,
+      "raw": "L40S",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/l4_8_24g/fr-par-1": {
+      "model": "L4 24GB",
+      "count": 8,
+      "raw": "L4",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/l4_8_24g/fr-par-2": {
+      "model": "L4 24GB",
+      "count": 8,
+      "raw": "L4",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/l4_8_24g/pl-waw-2": {
+      "model": "L4 24GB",
+      "count": 8,
+      "raw": "L4",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/l4_4_24g/fr-par-1": {
+      "model": "L4 24GB",
+      "count": 4,
+      "raw": "L4",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/l4_4_24g/fr-par-2": {
+      "model": "L4 24GB",
+      "count": 4,
+      "raw": "L4",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/l4_4_24g/pl-waw-2": {
+      "model": "L4 24GB",
+      "count": 4,
+      "raw": "L4",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/l4_2_24g/fr-par-1": {
+      "model": "L4 24GB",
+      "count": 2,
+      "raw": "L4",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/l4_2_24g/fr-par-2": {
+      "model": "L4 24GB",
+      "count": 2,
+      "raw": "L4",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/l4_2_24g/pl-waw-2": {
+      "model": "L4 24GB",
+      "count": 2,
+      "raw": "L4",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/l4_1_24g/fr-par-1": {
+      "model": "L4 24GB",
+      "count": 1,
+      "raw": "L4",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/l4_1_24g/fr-par-2": {
+      "model": "L4 24GB",
+      "count": 1,
+      "raw": "L4",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/l4_1_24g/pl-waw-2": {
+      "model": "L4 24GB",
+      "count": 1,
+      "raw": "L4",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/render_s/fr-par-1": {
+      "model": "P100 16GB",
+      "count": 1,
+      "raw": "P100",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    },
+    "/instance/server/render_s/fr-par-2": {
+      "model": "P100 16GB",
+      "count": 1,
+      "raw": "P100",
+      "source": "https://www.scaleway.com/en/pricing/gpu/",
+      "api_source": "https://api.scaleway.com/product-catalog/v2alpha1/public-catalog/products"
+    }
+  }
+}

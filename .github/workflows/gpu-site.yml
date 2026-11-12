@@ -1,0 +1,138 @@
+name: GPU site
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'pipelines/**'
+      - 'config/**'
+      - 'ci/**'
+      - '.github/workflows/gpu-site.yml'
+
+permissions:
+  contents: read
+
+# One lock for every production trigger, including manual runs. Do not interrupt
+# a writer or a deployment when a new run arrives.
+concurrency:
+  group: gpu-site-production
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  PYTHONDONTWRITEBYTECODE: '1'
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4.2.2
+        with:
+          # The event revision is retained; workflow_dispatch is main-only above.
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5.6.0
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node
+        uses: actions/setup-node@v4.4.0
+        with:
+          node-version: '22'
+
+      - name: Prepare reports and test dependency
+        run: |
+          mkdir -p ci/reports ci/runtime
+          python -m pip install --disable-pip-version-check pytest==8.4.2
+
+      - name: Restore persistent price history
+        id: restore
+        run: bash ci/restore_db.sh data/gpu_prices.sqlite ci/runtime/history-base
+
+      - name: Run offline pipeline tests
+        run: |
+          python -m pytest tests/test_gpu_prices.py -q -p no:cacheprovider --basetemp ci/runtime/pipeline-tests --junitxml ci/reports/pipeline-tests.xml
+          python -m unittest discover -s ci/tests -v 2>&1 | tee ci/reports/ci-tests.log
+
+      - name: Collect prices and apply provider failure policy
+        id: collect
+        timeout-minutes: 20
+        run: |
+          set +e
+          python -m pipelines.gpu_prices.run collect --db data/gpu_prices.sqlite >ci/reports/collect.json 2>ci/reports/collect.log
+          code=$?
+          set -e
+          cat ci/reports/collect.log
+          python ci/collection_gate.py ci/reports/collect.json "$code"
+
+      - name: Build production site
+        id: build
+        run: |
+          python -m pipelines.gpu_prices.run build --db data/gpu_prices.sqlite --out ci/runtime/site --site-base-url https://gpu-cloud-prices.pages.dev 2>ci/reports/build.log | tee ci/reports/build.json
+
+      - name: Audit published statistics
+        id: audit
+        run: |
+          python -m pipelines.gpu_prices.run audit --db data/gpu_prices.sqlite --out ci/runtime/site 2>ci/reports/audit.log | tee ci/reports/audit.json
+
+      - name: Deploy production to Cloudflare Pages
+        if: success() && steps.audit.outcome == 'success'
+        timeout-minutes: 5
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo '::error::Both Cloudflare Actions secrets must be configured.'
+            exit 1
+          fi
+          npx --yes wrangler@4.45.0 pages deploy ci/runtime/site --project-name gpu-cloud-prices --branch main
+
+      # Successful observations remain valuable even if build/audit/deploy fails,
+      # or the collect step times out after committing some provider batches.
+      - name: Save price history even after a pipeline failure
+        id: save
+        if: ${{ !cancelled() && steps.restore.outcome == 'success' && steps.collect.outcome != 'skipped' && steps.collect.outcome != '' }}
+        timeout-minutes: 3
+        run: bash ci/save_db.sh data/gpu_prices.sqlite ci/runtime/history-base
+
+      - name: Upload build and audit reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: gpu-site-reports-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ci/reports/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload generated site
+        if: ${{ always() && steps.build.outcome != 'skipped' && steps.build.outcome != '' }}
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: gpu-site-build-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ci/runtime/site/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Preserve database if the branch save failed
+        if: ${{ always() && steps.save.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: gpu-history-recovery-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ci/runtime/history-snapshot.sqlite
+          if-no-files-found: warn
+          retention-days: 7
