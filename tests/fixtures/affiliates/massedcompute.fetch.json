@@ -1,0 +1,14 @@
+{
+  "url": "https://vm.massedcompute.com/pricing",
+  "method": "GET",
+  "observed_at": "2026-11-12T21:10:49.583022+00:00",
+  "status": 200,
+  "final_url": "https://vm.massedcompute.com/pricing",
+  "content_type": "text/html; charset=utf-8",
+  "bytes": 580497,
+  "sha256": "ad6cb2e635561195f53098995634f33b27dd16e9abe392fb4d0fcb0366331e4a",
+  "fixture_sha256": "d202620eb2ce961be222c92986a390912bfe174f8a40136ae0691ae708de985c",
+  "fixture_bytes": 212009,
+  "extraction": "Verbatim complete GPU group divs",
+  "row_count": 74
+}

@@ -1,0 +1,14 @@
+{
+  "url": "https://www.cloudclusters.io/server/gpu",
+  "method": "GET",
+  "observed_at": "2026-11-12T21:14:01.256155+00:00",
+  "status": 200,
+  "final_url": "https://www.cloudclusters.io/server/gpu",
+  "content_type": "text/html",
+  "bytes": 254660,
+  "sha256": "204114531db5510aaa216abce9a2b8bd89d3f7fb3216e32e38a82488a44aad1c",
+  "fixture_sha256": "3805fe6e19c7668036214e9779a9a130776b2546cd1624fb331aaf563280b62e",
+  "fixture_bytes": 31660,
+  "extraction": "Verbatim plan card divs and allocation statement",
+  "row_count": 12
+}
