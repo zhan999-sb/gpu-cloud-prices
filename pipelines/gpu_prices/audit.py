@@ -178,7 +178,10 @@ def _snapshot(connection, day, generated):
         coverage.append({'provider':key,'name':provider['name'],'tier':provider['tier'],'status':status,
             'model_count':len({r['gpu_model'] for r in rows if r['provider']==key}),
             'last_success':max((r['finished_at'] for r in runs if r['provider']==key and r['status']=='complete'),default=None)})
-    return {'models':models,'exports':exports,'coverage':coverage,'date':day,'built':generated,'run':run,
+    monthly = []
+    if connection.execute("SELECT 1 FROM sqlite_master WHERE name='monthly_quotes'").fetchone():
+        monthly = [json.loads(r[0]) for r in connection.execute('SELECT payload FROM monthly_quotes WHERE collected_at=(SELECT MAX(collected_at) FROM monthly_quotes WHERE collected_at<=?) ORDER BY sku',(stamp(generated).isoformat(timespec='microseconds').replace('+00:00','Z'),))]
+    return {'monthly':monthly,'models':models,'exports':exports,'coverage':coverage,'date':day,'built':generated,'run':run,
             'summary':{'models':len({r['gpu_model'] for r in good}),'offers':len(good),'regions':len({r['region'] for r in good}),
                        'providers':len({r['provider'] for r in good}), 'updated':max((r['collected_at'] for r in good), default=None)},
             'all_rows':rows,'last_updated':max((r['collected_at'] for r in observed_rows),default=None),
@@ -223,6 +226,7 @@ class Page(HTMLParser):
         self.stack, self.values, self.metadata, self.structured, self.times, self.graphs = [], [], {}, [], [], []
         self.faqs, self.title, self.text, self.unmarked = {}, "", "", []
         self.cards, self.card = [], None
+        self.monthly_cards = []
         self.groups, self.offer_groups, self.summary_quotes, self.summary_strips = [], [], [], []
         self.links, self.h1, self.search_values, self.breadcrumbs, self.outside_values = [], [], {}, [], []
         self.faq_questions=[]
@@ -281,6 +285,8 @@ class Page(HTMLParser):
         if kind=='nav' and a.get('class')=='breadcrumbs':self.breadcrumbs.append(text)
         if 'data-summary-offer' in a:self.summary_quotes.append((a['data-summary-offer'],text))
         if a.get('class')=='summary-strip':self.summary_strips.append(text)
+        if 'data-monthly-quote' in a:
+            self.monthly_cards.append((a['data-monthly-quote'], text))
         if "data-stat" in a:
             self.values.append((a["data-stat"], a.get("data-format"), text))
             if self.card is None:self.outside_values.append(self.values[-1])
@@ -611,6 +617,44 @@ def _audit(conn, out):
             for key, value in expected_meta.items():
                 if page.metadata.get(key) != value:
                     errors.append(filename + ": " + key + " differs from independent statistics")
+            if name is None:
+                for listing in PROVIDER_ONLY:
+                    if sum(tag=='a' and a.get('data-provider-link')==listing['provider'] for tag,a in page.links) != 1:
+                        errors.append(filename+': missing or duplicated link-only provider '+listing['provider'])
+                expected_monthly = []
+                for i, row in enumerate(facts['monthly']):
+                    amount, months = row['price_per_month'], row['commitment_months']
+                    if (row['provider']!='cloudclusters' or row['tier']!='B' or row['export_allowed']
+                            or row['billing_unit']!='instance-month' or row['tax_basis']!='unknown'
+                            or row['currency']!='USD' or row['source_url']!='https://www.cloudclusters.io/server/gpu'
+                            or row['region']!='USA' or type(amount) not in (int,float)
+                            or not math.isfinite(amount) or amount<=0 or type(months) is not int or months<1):
+                        errors.append(filename+': invalid monthly quote policy')
+                    from .links import link_for
+                    link = link_for('cloudclusters','','','')
+                    copy = row['gpu_model']+row['sku']+tr.text('monthly_amount',price=_dollars(amount))
+                    copy += tr.text('monthly_commitment',months=format(months,'g'))
+                    copy += row['region']+' ? '+tr.text('tax_unknown')
+                    copy += tr.text('monthly_promotion' if row['is_promotion'] else 'monthly_standard')
+                    copy += row['collected_at'][:10]+' ? '+tr.text('stale_provider' if row['collected_at'][:10]!=facts['date'] else 'complete')
+                    copy += tr.text(link['label'],provider=link['provider_name'])
+                    expected_monthly.append((str(i),copy))
+                    required = {('/monthly/'+str(i)+'/'+k, f) for k,f in (
+                        ('gpu_model','text'),('sku','text'),('price_per_month','money'),
+                        ('commitment_months','number'),('region','text'),('collected_at','date'))}
+                    if not required.issubset({(p,f) for p,f,v in page.values}):
+                        errors.append(filename+': monthly quote pointers missing')
+                if page.monthly_cards != expected_monthly:
+                    errors.append(filename+': monthly quote display or commitment mismatch')
+            for tag, attrs in page.links:
+                if tag == 'a' and 'data-provider-link' in attrs:
+                    from .links import link_for
+                    key=attrs['data-provider-link']
+                    if key in {'novita','gpuoncloud','massedcompute','cloudclusters','hyperbolic'}:
+                        link=link_for(key,'','','')
+                        rel='sponsored nofollow noopener' if link['is_affiliate'] else 'nofollow noopener'
+                        if attrs.get('href')!=link['url'] or attrs.get('rel')!=rel:
+                            errors.append(filename+': affiliate destination or disclosure mismatch')
             for pointer, fmt, actual in page.values:
                 try:
                     value = _resolve(page_facts, pointer)

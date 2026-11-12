@@ -293,5 +293,15 @@
   "offer_page": "Ofertas de {model} — página {number}",
   "comparisons_heading": "Comparações selecionadas",
   "search_limits": "O mínimo abrange apenas ofertas elegíveis observadas, não todo o mercado. GPUs inteiras; regiões padrão ou não informadas; impostos excluídos ou desconhecidos. Sob demanda e Spot são separados. Aplicam-se condições, disponibilidade e taxas do provedor.",
-  "spec_sparse_preliminary": "Com esparsidade; especificações preliminares"
+  "spec_sparse_preliminary": "Com esparsidade; especificações preliminares",
+  "note_novita": "Somente link: os termos pro?bem a extra??o autom?tica de dados do site.",
+  "note_gpuoncloud": "Somente link: os termos excluem a coleta e o uso de listas de produtos e pre?os.",
+  "note_massedcompute": "Pre?os p?blicos por hora de inst?ncia, atribu?dos ? Massed Compute. Somente exibi??o conforme a EULA; regi?o e impostos n?o informados.",
+  "note_cloudclusters": "Planos mensais p?blicos com o compromisso selecionado; sem pre?o hor?rio de aluguel verificado.",
+  "monthly_heading": "Compromissos mensais da Cloud Clusters",
+  "monthly_policy": "Pre?os mensais por inst?ncia ficam separados das compara??es por hora de GPU e das exporta??es. Valem o compromisso e a promo??o selecionados; disponibilidade e impostos desconhecidos.",
+  "monthly_amount": "{price} por inst?ncia por m?s",
+  "monthly_commitment": "Compromisso: {months} meses",
+  "monthly_promotion": "Tarifa mensal promocional; aplicam-se crit?rios de elegibilidade e renova??o.",
+  "monthly_standard": "Tarifa mensal publicada; aplicam-se os termos do provedor."
 }

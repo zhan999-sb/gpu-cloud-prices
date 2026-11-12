@@ -526,7 +526,7 @@ def test_cli_all_network_failure_builds_honest_empty_site(tmp_path, monkeypatch,
             pass
         def collect(self, **kwargs):
             raise URLError("synthetic network outage")
-    for name in ("AzureCollector", "LinodeCollector", "ScalewayCollector", "VerdaCollector", "PageCollector", "CloreCollector"):
+    for name in ("AzureCollector", "LinodeCollector", "ScalewayCollector", "VerdaCollector", "PageCollector", "CloreCollector", "MonthlyCollector"):
         monkeypatch.setattr(run, name, FailingCollector)
     monkeypatch.setattr(run, "refresh", lambda path: (None, "unavailable"))
     monkeypatch.setattr(run, "configure_logging", lambda: None)
@@ -1592,7 +1592,7 @@ def test_blocked_page_providers_remain_link_only_and_outside_http_allowlist():
     from pipelines.gpu_prices.providers.page_collector import PARSERS
     from pipelines.gpu_prices.providers.registry import PROVIDERS
     from pipelines.gpu_prices.links import PROVIDER_ONLY
-    for name in ('runpod', 'digitalocean_gpu', 'salad', 'thunder', 'massedcompute'):
+    for name in ('runpod', 'digitalocean_gpu', 'salad', 'thunder'):
         assert not PROVIDERS[name]['enabled'] and PROVIDERS[name]['link_only']
         assert name not in PARSERS
         assert any(p['provider'] == name for p in PROVIDER_ONLY)

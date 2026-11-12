@@ -26,6 +26,7 @@ from .common import number
 from .pages import record, require
 from .pages.anygpu import gpu_fields
 from ..models import canonical_model
+from ..clore_auth import auth_headers, CloreRequestError
 
 API = "https://api.clore.ai/v1/marketplace"
 URLS = (API,)
@@ -56,27 +57,37 @@ def _retry_after(value):
 
 
 def fetch_json(url):
-    """Anonymous GET only, 120-second timeout, retry transient failures only."""
+    """GET with optional auth header, 120s timeout; transient retries only."""
     if url != API:
         raise ValueError("Only the official public Clore marketplace is allowed")
-    opener = build_opener(_NoRedirects())  # No cookie handler or authentication.
+    opener = build_opener(_NoRedirects())
+    credentials = auth_headers(url)
     for attempt in range(ATTEMPTS):
         delay = 2 ** (attempt + 1)
         try:
             request = Request(url, headers={"Accept": "application/json",
-                              "User-Agent": "gpu-price-index/0.1"}, method="GET")
+                              "User-Agent": "gpu-price-index/0.1", **credentials}, method="GET")
             with opener.open(request, timeout=TIMEOUT) as response:
                 data = response.read()
             return json.loads(data.decode("utf-8"))
         except HTTPError as exc:
             if exc.code != 429 and not 500 <= exc.code < 600:
-                raise  # In particular, never retry or circumvent a 401/403.
-            delay = max(delay, _retry_after(exc.headers.get("Retry-After")))
+                status = exc.code
+                exc.close()
+                raise CloreRequestError(status, bool(credentials)) from None
+            delay = max(delay, _retry_after(exc.headers.get("Retry-After") if exc.headers else None))
             if attempt + 1 == ATTEMPTS:
-                raise
+                status = exc.code
+                exc.close()
+                raise CloreRequestError(status, bool(credentials)) from None
+            exc.close()
         except (URLError, TimeoutError, ConnectionError, IncompleteRead):
             if attempt + 1 == ATTEMPTS:
-                raise
+                raise CloreRequestError(0, bool(credentials)) from None
+        except (ValueError, OSError):
+            raise CloreRequestError(0, bool(credentials)) from None
+        except Exception:
+            raise CloreRequestError(0, bool(credentials)) from None
         time.sleep(delay)
     raise AssertionError("unreachable")
 

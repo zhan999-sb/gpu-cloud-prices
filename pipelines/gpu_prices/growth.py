@@ -65,7 +65,7 @@ def fixture_offers():
     stamp = '2026-11-12T15:27:54Z'
     offers = []
     for name, parser in PARSERS.items():
-        folder = 'new_sources' if name in {'anygpu','ai_galaxy'} else 'provider_pages'
+        folder = 'affiliates' if name == 'massedcompute' else 'new_sources' if name in {'anygpu','ai_galaxy'} else 'provider_pages'
         path = root / folder / (name+'.html')
         if not path.exists() and name == 'lambda':
             path = root / folder / 'lambda_.html'

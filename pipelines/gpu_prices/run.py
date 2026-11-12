@@ -22,6 +22,8 @@ from .fx import refresh, to_usd
 from .schema import parse_utc, utc_now
 from .store import DEFAULT_DB, PriceStore, ROOT
 from .audit import audit_site, live_sample
+from .clore_auth import CloreRequestError
+from .monthly import MonthlyCollector
 
 LOG = logging.getLogger(__name__)
 
@@ -58,7 +60,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     parser.add_argument("--limit-pages", type=positive_int, default=None, help="Limit successful pages; coverage may be partial")
-    names = ("azure", "linode", "scaleway", "verda", "clore", *PARSERS)
+    names = ("azure", "linode", "scaleway", "verda", "clore", 'cloudclusters', *PARSERS)
     parser.add_argument("--provider", action="append", choices=names, help="Collect selected enabled providers; default collects all; pages at most hourly")
     parser.add_argument("--site-base-url", help="Public HTTPS origin; overrides SITE_BASE_URL (default: placeholder https://example.pages.dev)")
     parser.add_argument("--as-of", type=parse_utc, help="Build the exact snapshot at this UTC timestamp (build only)")
@@ -106,6 +108,7 @@ def main(argv: list[str] | None = None) -> int:
                     if name not in selected:
                         continue
                     collector = (PageCollector(name, store=store) if name in PARSERS else
+                                 MonthlyCollector(store=store) if name == 'cloudclusters' else
                                  CloreCollector(store=store) if name == 'clore' else factories[name]())
                     started = utc_now()
                     timer = perf_counter()
@@ -113,19 +116,27 @@ def main(argv: list[str] | None = None) -> int:
                         offers = collector.collect(limit_pages=args.limit_pages)
                         if getattr(collector, "skipped", False):
                             collections[name] = {"status": "skipped", "pages": 0, "records": 0,
-                                "reason": "page fetched within 60 minutes", "models": []}
+                                "reason": "page fetched within 60 minutes", "models": [],
+                                "checked_at": started, "previous_run": store.provider_runs().get(name)}
                             continue
                         offers = [to_usd(o, rates) for o in offers]
                         changed = store.upsert(offers)
+                        if name == 'cloudclusters':
+                            changed += collector.save()
+                        count = collector.raw_items if name == 'cloudclusters' else len(offers)
                         status = "complete" if collector.complete else "limited"
                         store.record_run(provider=name, started_at=started, status=status,
-                                         pages=collector.pages_fetched, records=len(offers))
+                                         pages=collector.pages_fetched, records=count)
                         collections[name] = {"status": status, "pages": collector.pages_fetched,
-                            "raw_items": collector.raw_items, "records": len(offers), "rows_changed": changed,
+                            "raw_items": collector.raw_items, "records": count, "rows_changed": changed,
+                            **({'monthly_records': collector.raw_items, 'hourly_records': 0} if name == 'cloudclusters' else {}),
                             "models": sorted({o.gpu_model for o in offers}),
                             "runtime_seconds": round(perf_counter() - timer, 3)}
                     except (OSError, ValueError, KeyError, TypeError, HTTPException) as exc:
-                        LOG.exception("%s collection failed; no partial batch saved", name)
+                        if isinstance(exc, CloreRequestError):
+                            LOG.error('%s collection failed: %s', name, exc)
+                        else:
+                            LOG.exception("%s collection failed; no partial batch saved", name)
                         store.record_run(provider=name, started_at=started, status="failed",
                                          pages=collector.pages_fetched, records=0, detail=type(exc).__name__)
                         collections[name] = {"status": "failed", "pages": collector.pages_fetched,

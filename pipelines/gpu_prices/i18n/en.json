@@ -293,5 +293,15 @@
   "offer_page": "{model} offers — page {number}",
   "comparisons_heading": "Selected comparisons",
   "search_limits": "Cheapest among observed eligible offers only, not a global-market minimum. Whole GPUs; standard or unspecified regions; tax excluded or unknown. On-demand and Spot are distinct. Provider terms, availability and fees still apply.",
-  "spec_sparse_preliminary": "With sparsity; preliminary specifications"
+  "spec_sparse_preliminary": "With sparsity; preliminary specifications",
+  "note_novita": "Link only: site terms prohibit automated extraction of website data.",
+  "note_gpuoncloud": "Link only: terms exclude collecting and using product listings and prices.",
+  "note_massedcompute": "Public instance-hour prices, attributed to Massed Compute. Display only under EULA reuse restrictions; region and tax unspecified.",
+  "note_cloudclusters": "Public monthly plans with the selected commitment; no verified hourly rental price.",
+  "monthly_heading": "Cloud Clusters monthly commitments",
+  "monthly_policy": "Monthly instance quotes are separate from hourly GPU comparisons and data exports. The selected commitment and promotion apply; availability and tax are unknown.",
+  "monthly_amount": "{price} per instance-month",
+  "monthly_commitment": "Commitment: {months} months",
+  "monthly_promotion": "Promotional monthly rate; eligibility and renewal terms apply.",
+  "monthly_standard": "Listed monthly rate; provider terms apply."
 }

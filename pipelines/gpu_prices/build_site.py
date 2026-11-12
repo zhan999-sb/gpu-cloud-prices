@@ -19,6 +19,7 @@ from .schema import Offer, parse_utc, utc_now
 from .store import PriceStore, ROOT
 from .regions import eligible, region_class, REGION_SOURCES
 from .links import link_for, PROVIDER_ONLY, PROVIDER_LINKS
+from .monthly import monthly_quotes
 from .providers.registry import PROVIDERS
 from .partners import surflare
 from .models import category, popular_rank, headline_order, POPULAR, CATEGORIES, model_family
@@ -184,6 +185,8 @@ def _stat(path, value, fmt="money", tag="span"):
     if fmt.startswith("instance-"):
         amount = value['price_per_hour'] * ((value['gpu_count'] or 1) if value['price_scope'] == 'per_gpu' else 1)
         formatted = _money(amount) if fmt == 'instance-money' else f'{amount:g}'
+    elif fmt == 'date':
+        formatted = value[:10]
     elif fmt == 'clock':
         formatted = parse_utc(value).strftime('%H:%M UTC')
     elif fmt == 'vram':
@@ -201,7 +204,7 @@ def _value(path, value, tr, fmt="money"):
 def _outbound(provider, sku, region, kind, model, tr):
     link = link_for(provider, sku, region, kind, model=model)
     rel = "sponsored nofollow noopener" if link["is_affiliate"] else "nofollow noopener"
-    return '<a class="button" href="' + escape(link["url"], quote=True) + '" target="_blank" rel="' + rel + '">' + tr.html(link["label"], provider=link['provider_name']) + '</a>'
+    return '<a class="button" data-provider-link="'+escape(provider,quote=True)+'" href="' + escape(link["url"], quote=True) + '" target="_blank" rel="' + rel + '">' + tr.html(link["label"], provider=link['provider_name']) + '</a>'
 
 
 def _badge(key, tr):
@@ -500,6 +503,23 @@ def _provider_cards(tr):
     return body + '</div>'
 
 
+def _monthly_cards(rows, tr, today):
+    if not rows:
+        return ''
+    body = '<h2>'+tr.html('monthly_heading')+'</h2><p>'+tr.html('monthly_policy')+'</p><div class="grid">'
+    for i, row in enumerate(rows):
+        path = '/monthly/'+str(i)
+        value = lambda field, fmt='text': _stat(path+'/'+field, row[field], fmt)
+        body += '<article class="card" data-monthly-quote="'+str(i)+'"><h3>'+value('gpu_model')+'</h3><p>'+value('sku')+'</p>'
+        body += '<p>'+tr.rich('monthly_amount',price=value('price_per_month','money'))+'</p>'
+        body += '<p>'+tr.rich('monthly_commitment',months=value('commitment_months','number'))+'</p>'
+        body += '<p>'+value('region')+' ? '+tr.html('tax_unknown')+'</p>'
+        body += '<p>'+tr.html('monthly_promotion' if row['is_promotion'] else 'monthly_standard')+'</p>'
+        body += '<p>'+value('collected_at','date')+' ? '+tr.html('stale_provider' if row['collected_at'][:10] != today else 'complete')+'</p>'
+        body += _outbound(row['provider'],'','','',row['provider'],tr)+'</article>'
+    return body+'</div>'
+
+
 def _summary_strip(entries, tr):
     good = [(p, o) for p, o in entries if eligible(Offer(**o))]
     parts = []
@@ -524,7 +544,7 @@ def _summary_strip(entries, tr):
     return body+'</aside>'
 
 
-def _home(offers, models, slugs, today, coverage, tr, model_data):
+def _home(offers, models, slugs, today, coverage, tr, model_data, monthly=()):
     selected = [o for o in offers if eligible(o)]
     active = sorted({o.gpu_model for o in selected})
     body = '<section class="hero"><h1>' + tr.html("home_heading") + '</h1><p>' + tr.html("home_intro") + '</p></section>'
@@ -555,7 +575,7 @@ def _home(offers, models, slugs, today, coverage, tr, model_data):
     if len(entries)>100:body+='<p class="unit">'+tr.html('list_cap')+'</p>'
     body+='<div class="model-directory">'+''.join('<a href="'+tr.language.path('/'+slugs[m]+'/')+'">'+tr.html('see_model',model=m)+'</a>' for m in models)+'</div>'
     # Partners follow both price lists. The footer is rendered unchanged.
-    body+=_partner(tr)+_provider_cards(tr)
+    body+=_partner(tr)+_provider_cards(tr)+_monthly_cards(monthly,tr,today)
     summary=[]
     for m in active:
         stats=model_data[m]['statistics'];base=_pointer('models',m,'statistics')
@@ -706,6 +726,7 @@ def build_site(store: PriceStore, out: str | Path = DEFAULT_OUT, *, today: str |
     complete_snapshot = True
     offers = [o for o in all_today if parse_utc(o.collected_at)<=parse_utc(built)]
     provider_coverage = coverage_data(store, today)
+    monthly = monthly_quotes(store.connection, built)
     observed_rows=[r for r in store.observation_rows() if parse_utc(r['collected_at'])<=parse_utc(built)]
     models = sorted({r['gpu_model'] for r in observed_rows})
     slugs = model_slugs(models)
@@ -748,7 +769,7 @@ def build_site(store: PriceStore, out: str | Path = DEFAULT_OUT, *, today: str |
     for lang in LANGUAGES:
         tr = catalogs[lang.code]
         coverage = _coverage(run, tr)
-        body, title, description = _home(offers, models, slugs, today, coverage + _provider_coverage(provider_coverage, tr), tr, model_data)
+        body, title, description = _home(offers, models, slugs, today, coverage + _provider_coverage(provider_coverage, tr), tr, model_data, monthly)
         website = {"@context": "https://schema.org", "@type": "WebSite", "name": tr.text("site_name"),
                    "url": origin + lang.path(), "description": description, "inLanguage": lang.code}
         pages[_page_file(lang.path())] = _page(title, body, last_updated, built, origin=origin, route="/", tr=tr,

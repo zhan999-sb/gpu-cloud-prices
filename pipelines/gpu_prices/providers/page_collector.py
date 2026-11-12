@@ -7,10 +7,10 @@ from ..http import HttpClient
 from ..schema import Offer, utc_now, validate_offer
 from ..models import canonical_model
 from .common import unique
-from .pages import featurize, nebius, lambda_, paperspace, baidu_gpu, anygpu, ai_galaxy
+from .pages import featurize, nebius, lambda_, paperspace, baidu_gpu, anygpu, ai_galaxy, massedcompute
 
 PARSERS = {module.__name__.rsplit(".", 1)[-1].rstrip("_"): module
-           for module in (featurize, nebius, lambda_, paperspace, baidu_gpu, anygpu, ai_galaxy)}
+           for module in (featurize, nebius, lambda_, paperspace, baidu_gpu, anygpu, ai_galaxy, massedcompute)}
 
 
 def normalize(row: dict) -> Offer:

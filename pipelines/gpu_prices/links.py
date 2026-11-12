@@ -36,11 +36,15 @@ PROVIDER_ONLY = (
 
 # Only the exact reviewed page destinations, with no invented referral contract.
 for _key, _entry in PROVIDERS.items():
-    if _entry['tier'] in {'B', 'C'}:
+    if _key not in PROVIDER_LINKS and (_entry['tier'] in {'B', 'C'} or _entry.get('link_only')):
         PROVIDER_LINKS[_key] = {'name': _entry['name'], 'url': _entry['source'], 'ref_param': None}
 PROVIDER_ONLY += tuple({'provider': key, 'name': entry['name'], 'pricing_url': entry['source'],
                        'gpu_models': (), 'note': entry['note']}
                       for key, entry in PROVIDERS.items() if entry.get('link_only'))
+
+
+AFFILIATES_CONFIG = Path(__file__).resolve().parents[2] / 'config' / 'affiliates.json'
+PENDING_PROVIDERS = frozenset({'novita', 'cloudclusters', 'gpuoncloud', 'massedcompute', 'hyperbolic'})
 
 
 def link_for(provider, sku, region, price_type, *, model=None):
@@ -56,11 +60,23 @@ def link_for(provider, sku, region, price_type, *, model=None):
     spec = AZURE_SKUS.get(sku) if provider == "azure" else None
     url = spec.source_url if spec else entry["url"]
     campaign = model or (spec.gpu_model if spec else provider)
+    config = json.loads(AFFILIATES_CONFIG.read_text(encoding='utf-8')) if AFFILIATES_CONFIG.exists() else {}
+    setting = config.get(provider, {})
+    if provider in PENDING_PROVIDERS:
+        # Activation requires BOTH a real ID and an explicitly configured URL.
+        # Pending links stay byte-for-byte plain, without UTMs or guessed IDs.
+        affiliate_url = setting.get('affiliate_url', '')
+        affiliate = setting.get('status') == 'active' and bool(str(setting.get('ref_id', '')).strip()) and bool(affiliate_url)
+        if affiliate:
+            target = urlsplit(affiliate_url)
+            if (target.scheme != 'https' or not target.hostname or target.username or target.password
+                    or any(ord(c) < 33 for c in affiliate_url)):
+                raise ValueError('Invalid configured affiliate URL for ' + provider)
+            url = affiliate_url
+        return {'url': url, 'label': 'view_provider', 'provider_name': entry['name'], 'is_affiliate': bool(affiliate)}
     ref = os.environ.get("AFFILIATE_" + re.sub(r"[^A-Z0-9]", "_", provider.upper()) + "_REF", "").strip()
     if provider == "vast" and "AFFILIATE_VAST_REF" not in os.environ:
-        config = Path(__file__).resolve().parents[2] / "config" / "affiliates.json"
-        if config.exists():
-            ref = str(json.loads(config.read_text(encoding="utf-8"))["vast"].get("ref_id", "")).strip()
+        ref = str(config.get('vast', {}).get('ref_id', '')).strip()
     parts = urlsplit(url)
     params = dict(parse_qsl(parts.query, keep_blank_values=True))
     affiliate = bool(ref and entry["ref_param"])

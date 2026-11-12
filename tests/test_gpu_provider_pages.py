@@ -23,7 +23,7 @@ ROOT = Path(__file__).parent / "fixtures" / "provider_pages"
 MANIFEST = json.loads((ROOT / "fetch_manifest.json").read_text(encoding="utf-8"))
 FETCHED_AT = "2026-11-12T13:24:09Z"
 SUPPORTED = ("featurize", "nebius", "lambda_", "paperspace", "baidu_gpu")
-BLOCKED = ("runpod", "digitalocean_gpu", "salad", "thunder", "massedcompute")
+BLOCKED = ("runpod", "digitalocean_gpu", "salad", "thunder")
 ALL = SUPPORTED + BLOCKED
 COUNTS = {"featurize": 11, "nebius": 14, "lambda_": 22,
           "paperspace": 13, "baidu_gpu": 31}

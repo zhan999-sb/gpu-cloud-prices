@@ -1,4 +1,4 @@
-"""The single HTTP boundary. No credentials, custom proxy, or network changes."""
+"""Allowlisted HTTP boundary; optional Clore auth stays on api.clore.ai."""
 
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -10,6 +10,7 @@ import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
+from .clore_auth import auth_headers, CloreRequestError
 
 LOG = logging.getLogger(__name__)
 USER_AGENT = "gpu-price-index/0.1 (+contact in site footer)"
@@ -22,6 +23,8 @@ PAGE_ENDPOINTS = {
     "lambda.com": {"/pricing"},
     "www.paperspace.com": {"/pricing"},
     "cloud.baidu.com": {"/product-price/gpu.html"},
+    "vm.massedcompute.com": {"/pricing"},
+    "www.cloudclusters.io": {"/server/gpu"},
 }
 ENDPOINTS = {
     **PAGE_ENDPOINTS,
@@ -86,19 +89,25 @@ class HttpClient:
     def get_bytes(self, url: str, *, accept="application/json") -> bytes:
         validate_url(url)  # Validation errors never retry or send a request.
         parts = urlsplit(url)
+        is_clore = parts.hostname == 'api.clore.ai'
+        credentials = auth_headers(url) if is_clore else {}
         # Page requests have a DB-backed hourly budget. A transient failure also
         # consumes it: do not issue extra requests inside the retry loop.
         attempts = 1 if parts.path in PAGE_ENDPOINTS.get(parts.hostname, set()) else ATTEMPTS
         for attempt in range(attempts):
             retry_after = 0.0
             try:
-                request = Request(url, headers={"User-Agent": USER_AGENT, "Accept": accept})
+                request = Request(url, headers={"User-Agent": USER_AGENT, "Accept": accept, **credentials})
                 with self._opener(request, timeout=TIMEOUT) as response:
                     validate_url(response.geturl())
                     if (urlsplit(response.geturl()).hostname, urlsplit(response.geturl()).path) != (urlsplit(url).hostname, urlsplit(url).path):
                         raise ValueError("Response moved to a different endpoint")
                     return response.read()
             except HTTPError as exc:
+                if is_clore:
+                    status = exc.code
+                    exc.close()
+                    raise CloreRequestError(status, bool(credentials)) from None
                 retry_after = self._retry_after(exc.headers.get("Retry-After")) if exc.headers else 0.0
                 status = exc.code
                 if status not in (408, 429, 500, 502, 503, 504):
@@ -108,7 +117,17 @@ class HttpClient:
                     raise
                 error = exc
             except (URLError, TimeoutError, ConnectionError, OSError, IncompleteRead) as exc:
+                if is_clore:
+                    raise CloreRequestError(0, bool(credentials)) from None
                 error = exc
+            except ValueError:
+                if is_clore:
+                    raise CloreRequestError(0, bool(credentials)) from None
+                raise
+            except Exception:
+                if is_clore:
+                    raise CloreRequestError(0, bool(credentials)) from None
+                raise
             if attempt == attempts - 1:
                 raise error
             delay = max(retry_after, 2 ** attempt + self._jitter())
@@ -117,7 +136,13 @@ class HttpClient:
         raise AssertionError("unreachable")
 
     def get_json(self, url: str) -> dict | list:
-        payload = json.loads(self.get_bytes(url))
+        data = self.get_bytes(url)
+        try:
+            payload = json.loads(data)
+        except (ValueError, UnicodeError):
+            if urlsplit(url).hostname == 'api.clore.ai':
+                raise CloreRequestError(0, bool(auth_headers(url))) from None
+            raise
         if not isinstance(payload, (dict, list)):
             raise ValueError("API response must be a JSON object or array")
         return payload

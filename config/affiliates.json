@@ -15,5 +15,30 @@
     "added": "2026-11-12",
     "promo_code": "k1ws798s",
     "terms_seen_2026_11_12": "Buyer gets 5% off with the code; referrer earns 20% of EVERY payment (recurring). Referrer and referee must be different users. Link auto-applies the code at checkout; cash only when the code is used at purchase. Suggested channels by Surflare: YouTube, Instagram, TikTok."
+  },
+  "novita": {
+    "status": "pending",
+    "program": "https://affiliates.novita.ai/",
+    "notes": "Pending enrollment. Research: 10% for 180 days. Tier D: site terms prohibit data extraction."
+  },
+  "cloudclusters": {
+    "status": "pending",
+    "program": "https://www.cloudclusters.io/affiliate",
+    "notes": "Pending enrollment. Research: $30 per GPU order. Public monthly quotes retain selected commitment."
+  },
+  "gpuoncloud": {
+    "status": "pending",
+    "program": "https://services.gpuoncloud.com/",
+    "notes": "Pending enrollment. Tier D: terms exclude collection and use of prices."
+  },
+  "massedcompute": {
+    "status": "pending",
+    "program": "https://massedcompute.com/affiliate-program/",
+    "notes": "Pending enrollment. Attributed public hourly table; C display only."
+  },
+  "hyperbolic": {
+    "status": "pending",
+    "program": "https://www.hyperbolic.ai/",
+    "notes": "Pending enrollment. Tier D: terms forbid scraping."
   }
 }

@@ -293,5 +293,15 @@
   "offer_page": "{model}: Angebote — Seite {number}",
   "comparisons_heading": "Ausgewählte Vergleiche",
   "search_limits": "Günstigster Preis nur unter erfassten vergleichbaren Angeboten, kein weltweites Marktminimum. Ganze GPUs; Standardregionen oder nicht angegebene Regionen; Steuer ausgeschlossen oder unbekannt. On-Demand und Spot sind getrennt. Anbieterbedingungen, Verfügbarkeit und Gebühren gelten weiterhin.",
-  "spec_sparse_preliminary": "Mit Sparsity; vorläufige Spezifikationen"
+  "spec_sparse_preliminary": "Mit Sparsity; vorläufige Spezifikationen",
+  "note_novita": "Nur Link: Die Bedingungen verbieten die automatische Extraktion von Websitedaten.",
+  "note_gpuoncloud": "Nur Link: Die Bedingungen schlie?en das Sammeln und Nutzen von Produktlisten und Preisen aus.",
+  "note_massedcompute": "?ffentliche Instanzstundenpreise mit Quellenangabe von Massed Compute. Wegen der EULA nur Anzeige; Region und Steuern nicht angegeben.",
+  "note_cloudclusters": "?ffentliche Monatstarife mit ausgew?hlter Laufzeit; kein best?tigter st?ndlicher Mietpreis.",
+  "monthly_heading": "Cloud Clusters: Monatstarife",
+  "monthly_policy": "Monatliche Instanzpreise sind von GPU-Stundenvergleichen und Datenexporten getrennt. Ausgew?hlte Laufzeit und Aktionsbedingungen gelten; Verf?gbarkeit und Steuern sind unbekannt.",
+  "monthly_amount": "{price} pro Instanzmonat",
+  "monthly_commitment": "Laufzeit: {months} Monate",
+  "monthly_promotion": "Aktionspreis pro Monat; Teilnahme- und Verl?ngerungsbedingungen gelten.",
+  "monthly_standard": "Angegebener Monatspreis; Bedingungen des Anbieters gelten."
 }
