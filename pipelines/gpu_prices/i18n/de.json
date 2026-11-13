@@ -334,5 +334,13 @@
   "growth_feed_provider": "Anbieter erstmals beobachtet: {provider} ({date})",
   "growth_feed_drop": "Beobachteter Tagespreisrückgang: {model} · {kind} · {before} → {price} ({date})",
   "growth_feed_low": "Neuer Tiefstand gespeicherter Beobachtungen: {model} · {kind} · {before} → {price} ({date})",
-  "growth_drop": "Preisrückgang · mindestens 10% unter dem Median der täglichen Minima der vorigen 7 Tage (gleicher Preistyp; alle 7 Tage erforderlich)"
+  "growth_drop": "Preisrückgang · mindestens 10% unter dem Median der täglichen Minima der vorigen 7 Tage (gleicher Preistyp; alle 7 Tage erforderlich)",
+  "note_aws": "Offizielle EC2-Preise für Linux mit geteilter Nutzung in zwei Regionen, täglich aktualisiert. Spot zeigt regionale Mindestpreise, keine Zonenangebote; diese bestimmen keine Vergleichsüberschriften.",
+  "note_oracle": "Offizieller GPU-Stundensatz multipliziert mit der geprüften GPU-Anzahl des Shapes. OCPUs bleiben von vCPUs getrennt. Region und Bestand sind unbekannt.",
+  "note_ovh": "Offizieller Katalog der französischen Niederlassung in EUR ohne MwSt. Linux-Instanzpreise pro Stunde; genaue Regionen und Bestand unbekannt. Keine abgeleiteten Lokal- oder Dreizonenpreise.",
+  "note_vultr": "Offizieller Stundenkatalog mit expliziter GPU-Anzahl. Fehlende Standorte belegen keinen Bestand. Unterbrechbare Preise sind getrennt; ungeprüfte virtuelle GPUs sind ausgeschlossen.",
+  "note_hetzner": "Öffentliche dedizierte GPU-Server mit Stundenabrechnung, Monatsobergrenze und zusätzlicher einmaliger Einrichtung. Konfigurationsabhängige Einstiegspreise sind markiert; nur Anzeige.",
+  "note_gcp": "Die offizielle Cloud Billing Catalog API benötigt einen API-Schlüssel eines Google-Cloud-Projekts. Erfassung erst nach dieser manuellen Einrichtung.",
+  "note_alibaba_intl": "Nur Link: Die internationalen Website-Bedingungen verbieten systematische Datenbankerstellung und Crawling. Keine Preiserfassung oder Exporte.",
+  "note_tencent_intl": "Nur Link: Internationale Bedingungen beschränken Benchmarking und konkurrierende Nutzung. Anonyme Preise sind ungeprüft; die Preis-API benötigt eine Signatur. Keine Erfassung oder Exporte."
 }

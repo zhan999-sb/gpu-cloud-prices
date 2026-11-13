@@ -1,0 +1,82 @@
+{
+  "request": {
+    "method": "GET",
+    "auth": false,
+    "cookies": false
+  },
+  "fixtures": {
+    "oracle.json": {
+      "source_url": "https://apexapps.oracle.com/pls/apex/cetools/api/v1/products/?currencyCode=USD",
+      "observed_at": "2026-11-13T00:05:49.731460+00:00",
+      "source_bytes": 201009,
+      "source_sha256": "153de584995f9d78a6b7010bd0019dff9586614f96f795bce744d3fb5a9c4577",
+      "fixture_bytes": 4939,
+      "fixture_sha256": "efd8c13a19677cfd176ecc01444175403575f7693e2c7c50a050251393e3fb02",
+      "trim": "Only reviewed GPU parts and three exclusion controls; field values unchanged."
+    },
+    "ovh.json": {
+      "source_url": "https://eu.api.ovh.com/1.0/order/catalog/public/cloud?ovhSubsidiary=FR",
+      "observed_at": "2026-11-13T00:05:49.732240+00:00",
+      "source_bytes": 8322791,
+      "source_sha256": "240441c19166623a403cd0de28e3267258070108d0fd321d1626acf77837d5c6",
+      "fixture_bytes": 21668,
+      "fixture_sha256": "82bb0cf1c8b9fa3e9777282e034ea453a1126ed52040d369f7775a988877792f",
+      "trim": "Relevant GPU addons and exclusion controls; unchanged addon fields and locale; unrelated arrays emptied."
+    },
+    "vultr.json": {
+      "source_url": "https://api.vultr.com/v2/plans?type=vcg&per_page=500",
+      "observed_at": "2026-11-13T00:05:49.729830+00:00",
+      "source_bytes": 1598,
+      "source_sha256": "07fca034fff99a8307fde8c8794ebef2abbff1369418d1af0d20224197b1dc99",
+      "fixture_bytes": 2253,
+      "fixture_sha256": "d2a7ce5e8796dece0648be375e2d2291afbea8749183e95c17f40b2ce8cd6092",
+      "trim": "Actual vcg-filtered API response, unmodified."
+    },
+    "vultr_metal.json": {
+      "source_url": "https://api.vultr.com/v2/plans-metal?per_page=500",
+      "observed_at": "2026-11-13T00:10:07.506785+00:00",
+      "source_bytes": 11690,
+      "source_sha256": "f0f2b91f471d3eae00a89ab2eba73d248e0599b7e6c39204380a081fa3f21d8e",
+      "fixture_bytes": 6657,
+      "fixture_sha256": "a4f4d3e58c6837aa0a9c46b7ec15444921ad9bb178a7c4d426710d83b5aa8851",
+      "trim": "GPU plans only; meta.total rebased to trimmed list; original total in full evidence."
+    },
+    "aws_index.json": {
+      "source_url": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/region_index.json",
+      "observed_at": "2026-11-13T00:05:49.732758+00:00",
+      "source_bytes": 18877,
+      "source_sha256": "0e8d627137deeb0ebad663767913f4319edd4be30157994ef18dc0b89164716d",
+      "fixture_bytes": 969,
+      "fixture_sha256": "983ab86b779e973b61e3e2f57fdc6fe21e3fe94cdc0d4639276b4fadb63aa43c",
+      "trim": "Four configured region entries; source values unchanged."
+    },
+    "aws_spot.json": {
+      "source_url": "https://website.spot.ec2.aws.a2z.com/spot.json",
+      "observed_at": "2026-11-13T00:05:49.864478+00:00",
+      "source_bytes": 2895481,
+      "source_sha256": "cda9adbe0bd34225dd8d098dbe7df05bb446b9445b7a498d3be6e93773c9cfd5",
+      "fixture_bytes": 14202,
+      "fixture_sha256": "a1d31df214545a705aaa9a1b22ce5224e79362b694d85ad173b31287e7530de9",
+      "trim": "Selected instance rows in four real regions; values and config unchanged."
+    },
+    "aws.csv": {
+      "source_url": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/us-east-1/index.csv",
+      "source_bytes": 302903252,
+      "source_sha256": null,
+      "observed_at": null,
+      "fixture_bytes": 17669,
+      "fixture_sha256": "484e4ef2ba1084c58ffabaf3c30e2137a260ab7e56fa8d7be46a5b3ffe58ce7a",
+      "trim": "Original metadata and columns; selected complete rows, excluding none of their fields; full CSV streamed without persistence. Raw extracted rows in runtime/b19/aws_live_rows.json. Exact start timestamp and complete CSV hash were not instrumented in this initial probe; no synthetic timestamp is assigned.",
+      "retrieval_date": "2026-11-13"
+    },
+    "hetzner.html": {
+      "source_url": "https://www.hetzner.com/dedicated-rootserver/matrix-gpu/",
+      "observed_at": "2026-11-13T00:05:50.347822+00:00",
+      "source_bytes": 164818,
+      "source_sha256": "080f1fd46652e2916ef1957bb4be59e847e594c22ebd855f8bda0eb636dd202e",
+      "fixture_bytes": 17836,
+      "fixture_sha256": "b798987b6df3af379c3cc864df5131fb0c21d069588e1a2b8e8d59cc75d902eb",
+      "trim": "Four complete original GPU cards; all price and specification text unchanged."
+    }
+  }
+}

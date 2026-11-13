@@ -334,5 +334,13 @@
   "growth_feed_provider": "Provider first observed: {provider} ({date})",
   "growth_feed_drop": "Observed daily price drop: {model} · {kind} · {before} → {price} ({date})",
   "growth_feed_low": "New low in retained observations: {model} · {kind} · {before} → {price} ({date})",
-  "growth_drop": "Price drop · at least 10% below the median of the previous 7 observed daily minima (same price type; all 7 days required)"
+  "growth_drop": "Price drop · at least 10% below the median of the previous 7 observed daily minima (same price type; all 7 days required)",
+  "note_aws": "Official EC2 Linux shared-tenancy prices in two regions, refreshed daily. Spot entries are regional lowest prices, not availability-zone quotes; these floors do not set comparison headlines.",
+  "note_oracle": "Official GPU-hour rate multiplied by the reviewed shape GPU count. OCPUs remain distinct from vCPUs. Region and inventory are unspecified.",
+  "note_ovh": "Official FR subsidiary catalog in EUR, excluding VAT. Linux hourly instance prices; exact regions and capacity are unspecified. Local-zone and three-zone prices are not inferred.",
+  "note_vultr": "Official hourly catalog with explicit GPU counts. Missing locations do not imply available capacity. Preemptible rates are labelled separately; unverified virtual GPU allocations are excluded.",
+  "note_hetzner": "Public dedicated GPU servers, billed hourly with a monthly cap and an additional one-time setup fee. Configuration starting prices remain marked; display only.",
+  "note_gcp": "The official Cloud Billing Catalog API requires an API key from a Google Cloud project. Collection is disabled until this human setup step is completed.",
+  "note_alibaba_intl": "Link only: international website terms prohibit systematic retrieval to build a database and crawling. No pricing collection or export.",
+  "note_tencent_intl": "Link only: international terms restrict benchmarking and use competitive with the services. Anonymous pricing was not verified; the quote API needs a signature. No collection or export."
 }

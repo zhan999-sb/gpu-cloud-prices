@@ -1,5 +1,11 @@
 """Reviewed policies. Disabled and D providers deliberately have no collector."""
 PROVIDERS = {
+    "aws": {"name": "AWS EC2", "tier": "A", "enabled": True, "note": "note_aws", "source": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/region_index.json"},
+    "gcp": {"name": "Google Cloud", "tier": "A", "enabled": False, "note": "note_gcp", "source": "https://cloud.google.com/compute/gpus-pricing"},
+    "hetzner": {"name": "Hetzner", "tier": "B", "enabled": True, "note": "note_hetzner", "source": "https://www.hetzner.com/dedicated-rootserver/matrix-gpu/"},
+    "alibaba_intl": {"name": "Alibaba Cloud International", "tier": "D", "enabled": False, "link_only": True, "note": "note_alibaba_intl", "source": "https://www.alibabacloud.com/en/product/ecs/pricing"},
+    "tencent_intl": {"name": "Tencent Cloud International", "tier": "D", "enabled": False, "link_only": True, "note": "note_tencent_intl", "source": "https://www.tencentcloud.com/pricing/cvm"},
+
     "clore": {"name": "Clore.ai", "tier": "A", "enabled": True, "note": "note_clore", "source": "https://clore.ai/marketplace"},
     "anygpu": {"name": "AnyGPU 算力云", "tier": "C", "enabled": True, "note": "note_anygpu", "source": "https://www.anygpu.cn/"},
     "ai_galaxy": {"name": "智星云", "tier": "C", "enabled": True, "note": "note_ai_galaxy", "source": "https://www.ai-galaxy.cn/"},
@@ -21,9 +27,9 @@ PROVIDERS = {
     "novita": {"name": "Novita AI", "tier": "D", "enabled": False, "link_only": True, "note": "note_novita", "source": "https://novita.ai/gpus"},
     "gpuoncloud": {"name": "GPUonCLOUD", "tier": "D", "enabled": False, "link_only": True, "note": "note_gpuoncloud", "source": "https://services.gpuoncloud.com/"},
     "hyperbolic": {"name": "Hyperbolic", "tier": "D", "enabled": False, "link_only": True, "note": "link_only_note", "source": "https://www.hyperbolic.ai/"},
-    "vultr": {"name": "Vultr", "tier": "A", "enabled": False, "note": "todo_vultr", "source": "https://api.vultr.com/v2/plans"},
-    "oracle": {"name": "Oracle Cloud", "tier": "A", "enabled": False, "note": "todo_oracle", "source": "https://apexapps.oracle.com/pls/apex/cetools/api/v1/products/"},
-    "ovh": {"name": "OVHcloud", "tier": "A", "enabled": False, "note": "todo_ovh", "source": "https://eu.api.ovh.com/1.0/order/catalog/public/cloud?ovhSubsidiary=FR"},
+    "vultr": {"name": "Vultr", "tier": "A", "enabled": True, "note": "note_vultr", "source": "https://api.vultr.com/v2/plans"},
+    "oracle": {"name": "Oracle Cloud", "tier": "A", "enabled": True, "note": "note_oracle", "source": "https://apexapps.oracle.com/pls/apex/cetools/api/v1/products/"},
+    "ovh": {"name": "OVHcloud", "tier": "A", "enabled": True, "note": "note_ovh", "source": "https://eu.api.ovh.com/1.0/order/catalog/public/cloud?ovhSubsidiary=FR"},
     "vast": {"name": "Vast.ai", "tier": "D", "enabled": False, "note": "link_only_note", "source": "https://vast.ai/terms"},
     "together": {"name": "Together", "tier": "D", "enabled": False, "note": "link_only_note", "source": "https://www.together.ai/terms-of-service"},
 }

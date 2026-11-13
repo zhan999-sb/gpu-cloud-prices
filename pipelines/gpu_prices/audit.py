@@ -346,6 +346,11 @@ def _allowed_literals(tr, facts):
     """
     allowed = {v for v in tr.messages.values() if '{' not in v}
     allowed.update(part.strip() for part in tr.messages['method_api'].split('{source}'))
+    allowed.update(p['name'] for p in PROVIDERS.values())
+    allowed.update(tr.text('provider_intro', provider=p['name']) for p in PROVIDERS.values())
+    allowed.update(tr.text('view_provider', provider=p['name']) for p in PROVIDERS.values())
+    allowed.update('('+tr.text(kind)+' · '+p['name']+' ·' for p in PROVIDERS.values()
+                   for kind in ('on_demand','spot'))
     # Exact localized referral disclosure, including the contractual 5% and
     # public promo code. Changing either number must still fail the audit.
     partner = json.loads((Path(__file__).resolve().parents[2] / 'config' / 'affiliates.json').read_text(encoding='utf-8'))['surflare']
@@ -557,6 +562,29 @@ def _audit(conn, out):
     # Independently verify the new semantic/provenance contract in SQLite.
     for row in facts['all_rows']:
         key = row['provider'] + '/' + row['sku']
+        # Independent catalog policy checks, without calling the collectors.
+        provider = row['provider']
+        native = row['original_currency'] or row['currency']
+        if provider in {'gcp', 'alibaba_intl', 'tencent_intl'}:
+            errors.append(key + ': disabled or link-only provider has observations')
+        if provider in {'aws', 'oracle', 'ovh', 'vultr', 'hetzner'}:
+            tier = 'B' if provider == 'hetzner' else 'A'
+            if row['tier'] != tier or row['export_allowed'] != (tier == 'A') or row['price_scope'] != 'instance':
+                errors.append(key + ': public catalog policy mismatch')
+            if native != ('EUR' if provider in {'ovh','hetzner'} else 'USD'):
+                errors.append(key + ': catalog source currency mismatch')
+            if provider in {'aws','ovh','hetzner'} and row['tax_basis'] != 'excluded':
+                errors.append(key + ': source tax basis mismatch')
+            if provider == 'aws' and row['price_type'] == 'spot' and (not row['is_from_price'] or row['zone'] is not None or row['source_url'] != 'https://website.spot.ec2.aws.a2z.com/spot.json'):
+                errors.append(key + ': regional Spot floor policy mismatch')
+            if provider == 'aws' and row['sku'].split('.')[0] in {'p5e','p5en'} and row['gpu_model'] != 'H200 141GB':
+                errors.append(key + ': H200 per-GPU memory must match official specifications')
+            if provider == 'ovh' and (row['source_url'] != 'https://eu.api.ovh.com/1.0/order/catalog/public/cloud?ovhSubsidiary=FR' or not row['sku'].endswith('.consumption')):
+                errors.append(key + ': public consumption source mismatch')
+            if provider == 'ovh' and row['minimum_billing_seconds'] != 60:
+                errors.append(key + ': OVH initial one-minute billing minimum missing')
+            if provider == 'oracle' and row['source_billing_unit'] != 'GPU-hour':
+                errors.append(key + ': GPU billing unit provenance missing')
         if row['tier'] not in {'A','B','C'} or row['export_allowed'] and row['tier'] != 'A':
             errors.append(key + ': tier/export policy violation')
         if row['billing_unit'] not in {'instance-hour','instance-minute','instance-second','GPU-hour','gpu-hour','GPU-second'}:

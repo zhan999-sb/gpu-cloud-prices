@@ -3,9 +3,11 @@
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from http.client import IncompleteRead
+import hashlib
 import json
 import logging
 import random
+import re
 import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
@@ -37,6 +39,12 @@ ENDPOINTS = {
     "eu.api.ovh.com": {"/1.0/order/catalog/public/cloud"},
     "www.ecb.europa.eu": {"/stats/eurofxref/eurofxref-daily.xml"},
 }
+ENDPOINTS['api.vultr.com'].add('/v2/plans-metal')
+ENDPOINTS['pricing.us-east-1.amazonaws.com'] = {'/offers/v1.0/aws/AmazonEC2/current/region_index.json'}
+ENDPOINTS['website.spot.ec2.aws.a2z.com'] = {'/spot.json'}
+ENDPOINTS['www.hetzner.com'] = {'/dedicated-rootserver/matrix-gpu/'}
+BOUNDED_HOSTS = frozenset({'pricing.us-east-1.amazonaws.com', 'website.spot.ec2.aws.a2z.com',
+                         'api.vultr.com', 'apexapps.oracle.com', 'eu.api.ovh.com', 'www.hetzner.com'})
 ALLOWED_HOSTS = frozenset(ENDPOINTS)
 TIMEOUT = 60
 ATTEMPTS = 5
@@ -51,7 +59,9 @@ def validate_url(url: str) -> str:
         valid = (parts.scheme == "https" and parts.hostname in ALLOWED_HOSTS
                  and parts.port in (None, 443) and not parts.username
                  and not parts.password and not parts.fragment
-                 and parts.path in ENDPOINTS.get(parts.hostname, set()))
+                 and (parts.path in ENDPOINTS.get(parts.hostname, set()) or
+                      parts.hostname == 'pricing.us-east-1.amazonaws.com' and
+                      re.fullmatch(r'/offers/v1\.0/aws/AmazonEC2/(?:current|[0-9]{14})/[a-z]{2}-[a-z]+-[1-9]/index\.csv', parts.path)))
     except ValueError as exc:
         raise ValueError("Invalid API URL") from exc
     if not valid:
@@ -67,6 +77,8 @@ class _NoRedirects(HTTPRedirectHandler):
 
 class HttpClient:
     def __init__(self, *, opener=None, sleep=time.sleep, jitter=random.random, now=None):
+        self.bytes_read = 0
+        self.stream_metrics = []
         self._opener = opener or build_opener(_NoRedirects()).open
         self._sleep = sleep
         self._jitter = jitter
@@ -93,15 +105,21 @@ class HttpClient:
         credentials = auth_headers(url) if is_clore else {}
         # Page requests have a DB-backed hourly budget. A transient failure also
         # consumes it: do not issue extra requests inside the retry loop.
-        attempts = 1 if parts.path in PAGE_ENDPOINTS.get(parts.hostname, set()) else ATTEMPTS
+        attempts = 1 if parts.hostname in BOUNDED_HOSTS or parts.path in PAGE_ENDPOINTS.get(parts.hostname, set()) else ATTEMPTS
         for attempt in range(attempts):
             retry_after = 0.0
             try:
                 request = Request(url, headers={"User-Agent": USER_AGENT, "Accept": accept, **credentials})
-                with self._opener(request, timeout=TIMEOUT) as response:
+                with self._opener(request, timeout=30 if parts.hostname in BOUNDED_HOSTS else TIMEOUT) as response:
                     validate_url(response.geturl())
                     if (urlsplit(response.geturl()).hostname, urlsplit(response.geturl()).path) != (urlsplit(url).hostname, urlsplit(url).path):
                         raise ValueError("Response moved to a different endpoint")
+                    if parts.hostname in BOUNDED_HOSTS:
+                        result = response.read(16_000_001)
+                        if len(result) > 16_000_000:
+                            raise ValueError('catalog exceeds 16 MB budget')
+                        self.bytes_read += len(result)
+                        return result
                     return response.read()
             except HTTPError as exc:
                 if is_clore:
@@ -134,6 +152,33 @@ class HttpClient:
             LOG.warning("HTTP attempt %d/%d failed (%s); retry in %.2fs", attempt + 1, ATTEMPTS, error, delay)
             self._sleep(delay)
         raise AssertionError("unreachable")
+
+    def iter_lines(self, url, *, max_bytes=350_000_000, max_seconds=150):
+        """One bounded streaming bulk request. No retries, disk cache or credentials."""
+        validate_url(url)
+        if urlsplit(url).hostname != 'pricing.us-east-1.amazonaws.com' or not urlsplit(url).path.endswith('/index.csv'):
+            raise ValueError('streaming requires an approved EC2 regional CSV')
+        started, size = time.monotonic(), 0
+        observed_at = self._now().isoformat()
+        digest = hashlib.sha256()
+        with self._opener(Request(url, headers={'User-Agent': USER_AGENT, 'Accept': 'text/csv'}), timeout=30) as response:
+            if response.geturl() != url:
+                raise ValueError('bulk response moved')
+            length = response.headers.get('Content-Length')
+            if length and int(length) > max_bytes:
+                raise ValueError('bulk catalog exceeds byte budget')
+            while True:
+                line = response.readline(65537)
+                if not line:
+                    break
+                size += len(line)
+                self.bytes_read += len(line)
+                digest.update(line)
+                if len(line) > 65536 or size > max_bytes or time.monotonic() - started > max_seconds:
+                    raise ValueError('bulk catalog exceeds byte, line or time budget')
+                yield line.decode('utf-8')
+        self.stream_metrics.append({'url': url, 'bytes': size, 'observed_at': observed_at,
+                                    'seconds': round(time.monotonic()-started, 3), 'sha256': digest.hexdigest()})
 
     def get_json(self, url: str) -> dict | list:
         data = self.get_bytes(url)

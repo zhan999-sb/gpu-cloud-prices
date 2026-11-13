@@ -334,5 +334,13 @@
   "growth_feed_provider": "Fournisseur observé pour la première fois : {provider} ({date})",
   "growth_feed_drop": "Baisse quotidienne observée : {model} · {kind} · {before} → {price} ({date})",
   "growth_feed_low": "Nouveau minimum des observations conservées : {model} · {kind} · {before} → {price} ({date})",
-  "growth_drop": "Baisse de prix · au moins 10% sous la médiane des minima quotidiens des 7 jours précédents (même type de prix ; 7 jours observés requis)"
+  "growth_drop": "Baisse de prix · au moins 10% sous la médiane des minima quotidiens des 7 jours précédents (même type de prix ; 7 jours observés requis)",
+  "note_aws": "Tarifs officiels EC2 Linux à usage partagé dans deux régions, actualisés chaque jour. Spot indique un minimum régional, pas un devis par zone ; ces planchers sont exclus des prix de référence.",
+  "note_oracle": "Tarif officiel par GPU-heure multiplié par le nombre vérifié de GPU du shape. OCPU et vCPU restent distincts. Région et disponibilité non précisées.",
+  "note_ovh": "Catalogue officiel de la filiale FR en EUR hors TVA. Prix horaires des instances Linux ; régions et stock non précisés. Aucun prix local ou trois zones déduit.",
+  "note_vultr": "Catalogue horaire officiel avec nombre explicite de GPU. Une liste de lieux vide ne garantit aucun stock. Tarifs préemptibles séparés ; GPU virtuels non vérifiés exclus.",
+  "note_hetzner": "Serveurs GPU dédiés publics, facturés à l’heure avec plafond mensuel et frais uniques d’installation en supplément. Prix de départ signalés ; affichage uniquement.",
+  "note_gcp": "L’API officielle Cloud Billing Catalog exige une clé API d’un projet Google Cloud. Collecte désactivée avant cette configuration manuelle.",
+  "note_alibaba_intl": "Lien uniquement : les conditions du site international interdisent l’extraction systématique pour créer une base et l’exploration automatisée. Aucune collecte ni export.",
+  "note_tencent_intl": "Lien uniquement : les conditions internationales limitent les comparatifs et les usages concurrents. Tarifs anonymes non vérifiés ; API de devis signée. Aucune collecte ni export."
 }

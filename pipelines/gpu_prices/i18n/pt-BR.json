@@ -334,5 +334,13 @@
   "growth_feed_provider": "Provedor observado pela primeira vez: {provider} ({date})",
   "growth_feed_drop": "Queda diária observada: {model} · {kind} · {before} → {price} ({date})",
   "growth_feed_low": "Nova mínima nas observações preservadas: {model} · {kind} · {before} → {price} ({date})",
-  "growth_drop": "Queda de preço · pelo menos 10% abaixo da mediana das mínimas diárias dos 7 dias anteriores (mesmo tipo de preço; todos os 7 dias exigidos)"
+  "growth_drop": "Queda de preço · pelo menos 10% abaixo da mediana das mínimas diárias dos 7 dias anteriores (mesmo tipo de preço; todos os 7 dias exigidos)",
+  "note_aws": "Preços oficiais EC2 Linux de uso compartilhado em duas regiões, atualizados diariamente. Spot mostra mínimos regionais, não cotações por zona; esses pisos não definem os preços em destaque.",
+  "note_oracle": "Tarifa oficial por GPU-hora multiplicada pela quantidade de GPUs do shape verificado. OCPU e vCPU permanecem distintos. Região e estoque não informados.",
+  "note_ovh": "Catálogo oficial da filial FR em EUR sem IVA. Preços por hora de instâncias Linux; regiões e estoque não informados. Preços locais e de três zonas não são inferidos.",
+  "note_vultr": "Catálogo oficial por hora com quantidade explícita de GPUs. Locais ausentes não garantem estoque. Tarifas preemptivas separadas; GPUs virtuais não verificadas excluídas.",
+  "note_hetzner": "Servidores GPU dedicados públicos, cobrados por hora com teto mensal e taxa única de instalação adicional. Preços iniciais identificados; somente exibição.",
+  "note_gcp": "A API oficial Cloud Billing Catalog exige uma chave API de um projeto Google Cloud. Coleta desativada até concluir essa configuração manual.",
+  "note_alibaba_intl": "Somente link: os termos internacionais proíbem extração sistemática para criar bancos de dados e rastreamento. Sem coleta ou exportação de preços.",
+  "note_tencent_intl": "Somente link: os termos internacionais restringem comparativos e usos concorrentes. Preços anônimos não verificados; API de cotação exige assinatura. Sem coleta ou exportação."
 }

@@ -334,5 +334,13 @@
   "growth_feed_provider": "Proveedor observado por primera vez: {provider} ({date})",
   "growth_feed_drop": "Caída diaria observada: {model} · {kind} · {before} → {price} ({date})",
   "growth_feed_low": "Nuevo mínimo de las observaciones conservadas: {model} · {kind} · {before} → {price} ({date})",
-  "growth_drop": "Bajada de precio · al menos 10% por debajo de la mediana de los mínimos diarios de los 7 días anteriores (mismo tipo de precio; se requieren los 7 días)"
+  "growth_drop": "Bajada de precio · al menos 10% por debajo de la mediana de los mínimos diarios de los 7 días anteriores (mismo tipo de precio; se requieren los 7 días)",
+  "note_aws": "Precios oficiales EC2 Linux de uso compartido en dos regiones, actualizados a diario. Spot muestra mínimos regionales, no cotizaciones por zona; estos mínimos no fijan los precios destacados.",
+  "note_oracle": "Tarifa oficial por GPU-hora multiplicada por el número de GPU del tipo verificado. OCPU y vCPU se mantienen separados. Región e inventario sin especificar.",
+  "note_ovh": "Catálogo oficial de la filial FR en EUR sin IVA. Precios horarios de instancias Linux; regiones e inventario sin especificar. No se deducen precios locales ni de tres zonas.",
+  "note_vultr": "Catálogo horario oficial con cantidad explícita de GPU. La ausencia de ubicaciones no garantiza inventario. Tarifas interrumpibles separadas; GPU virtuales sin verificar excluidas.",
+  "note_hetzner": "Servidores GPU dedicados públicos, facturados por hora con tope mensual y cargo único de instalación adicional. Precios iniciales marcados; solo visualización.",
+  "note_gcp": "La API oficial Cloud Billing Catalog requiere una clave API de un proyecto Google Cloud. Recopilación desactivada hasta completar este paso manual.",
+  "note_alibaba_intl": "Solo enlace: los términos internacionales prohíben la extracción sistemática para crear bases de datos y el rastreo. Sin recopilación ni exportación de precios.",
+  "note_tencent_intl": "Solo enlace: los términos internacionales restringen las comparativas y el uso competitivo. Precios anónimos sin verificar; API de cotización con firma. Sin recopilación ni exportación."
 }

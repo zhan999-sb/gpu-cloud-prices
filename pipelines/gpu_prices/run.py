@@ -16,6 +16,7 @@ from .providers.azure import AzureCollector
 from .providers.linode import LinodeCollector
 from .providers.scaleway import ScalewayCollector
 from .providers.verda import VerdaCollector
+from .providers.hyperscalers import AwsCollector, OracleCollector, OvhCollector, VultrCollector, HetznerCollector
 from .providers.page_collector import PageCollector, PARSERS
 from .providers.clore_collector import CloreCollector
 from .fx import refresh, to_usd
@@ -60,7 +61,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     parser.add_argument("--limit-pages", type=positive_int, default=None, help="Limit successful pages; coverage may be partial")
-    names = ("azure", "linode", "scaleway", "verda", "clore", 'cloudclusters', *PARSERS)
+    extra = {'aws': AwsCollector, 'oracle': OracleCollector, 'ovh': OvhCollector,
+             'vultr': VultrCollector, 'hetzner': HetznerCollector}
+    names = ("azure", "linode", "scaleway", "verda", "clore", 'cloudclusters', *extra, *PARSERS)
     parser.add_argument("--provider", action="append", choices=names, help="Collect selected enabled providers; default collects all; pages at most hourly")
     parser.add_argument("--site-base-url", help="Public HTTPS origin; overrides SITE_BASE_URL (default: placeholder https://example.pages.dev)")
     parser.add_argument("--as-of", type=parse_utc, help="Build the exact snapshot at this UTC timestamp (build only)")
@@ -100,23 +103,29 @@ def main(argv: list[str] | None = None) -> int:
                         exit_code = 1
             if args.command in {"collect", "all"}:
                 selected = set(args.provider or names)
-                rates, fx_status = refresh(args.db.parent / "ecb_rates.json") if selected & {'scaleway', 'featurize', 'baidu_gpu', 'anygpu', 'ai_galaxy'} else (None, 'not_required')
+                rates, fx_status = refresh(args.db.parent / "ecb_rates.json") if selected & {'scaleway', 'ovh', 'hetzner', 'featurize', 'baidu_gpu', 'anygpu', 'ai_galaxy'} else (None, 'not_required')
                 summary["fx"] = {"status": fx_status, "date": rates["date"] if rates else None}
                 collections = {}
+                catalog_skips = {}
                 factories = {"azure": AzureCollector, "linode": LinodeCollector, "scaleway": ScalewayCollector, "verda": VerdaCollector}
                 for name in names:
                     if name not in selected:
                         continue
                     collector = (PageCollector(name, store=store) if name in PARSERS else
                                  MonthlyCollector(store=store) if name == 'cloudclusters' else
-                                 CloreCollector(store=store) if name == 'clore' else factories[name]())
+                                 CloreCollector(store=store) if name == 'clore' else
+                                 extra[name](store=store) if name in extra else factories[name]())
                     started = utc_now()
                     timer = perf_counter()
                     try:
                         offers = collector.collect(limit_pages=args.limit_pages)
                         if getattr(collector, "skipped", False):
-                            collections[name] = {"status": "skipped", "pages": 0, "records": 0,
-                                "reason": "page fetched within 60 minutes", "models": [],
+                            # The existing CI gate understands only its exact
+                            # hourly skip contract. Longer catalog deferrals
+                            # have their own truthful, additive report section.
+                            target = catalog_skips if name in extra else collections
+                            target[name] = {"status": "skipped", "pages": 0, "records": 0,
+                                "reason": (f"source attempted within {collector.interval_hours} hours" if name in extra else "page fetched within 60 minutes"), "models": [],
                                 "checked_at": started, "previous_run": store.provider_runs().get(name)}
                             continue
                         offers = [to_usd(o, rates) for o in offers]
@@ -131,6 +140,8 @@ def main(argv: list[str] | None = None) -> int:
                             "raw_items": collector.raw_items, "records": count, "rows_changed": changed,
                             **({'monthly_records': collector.raw_items, 'hourly_records': 0} if name == 'cloudclusters' else {}),
                             "models": sorted({o.gpu_model for o in offers}),
+                            **({'network_bytes': getattr(collector.client, 'bytes_read', 0),
+                                'bulk_streams': getattr(collector.client, 'stream_metrics', [])} if name in extra else {}),
                             "runtime_seconds": round(perf_counter() - timer, 3)}
                     except (OSError, ValueError, KeyError, TypeError, HTTPException) as exc:
                         if isinstance(exc, CloreRequestError):
@@ -144,7 +155,9 @@ def main(argv: list[str] | None = None) -> int:
                             "runtime_seconds": round(perf_counter() - timer, 3)}
                         exit_code = 1
                 summary["collections"] = collections
-                summary["collection"] = collections.get("azure", next(iter(collections.values())))
+                if catalog_skips:
+                    summary['catalog_skips'] = catalog_skips
+                summary["collection"] = collections.get("azure") or next(iter(collections.values()), None) or next(iter(catalog_skips.values()))
             if args.command in {"build", "all"}:
                 summary["build"] = build_site(store, args.out, site_base_url=args.site_base_url,
                                              today=args.as_of.date().isoformat() if args.as_of else None,

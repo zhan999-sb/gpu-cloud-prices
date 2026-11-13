@@ -191,18 +191,20 @@ class PriceStore:
     def close(self) -> None:
         self.connection.close()
 
-    def claim_page_fetch(self, provider: str, stamp: str) -> bool:
+    def claim_page_fetch(self, provider: str, stamp: str, *, interval_hours: int = 1) -> bool:
         """Reserve the hourly request before IO, including failed attempts.
 
         BEGIN IMMEDIATE serializes overlapping workflow processes. Skipping does
         not replace the last collection run or pretend that prices were fetched.
         """
+        if type(interval_hours) is not int or interval_hours < 1:
+            raise ValueError('interval_hours must be a positive integer')
         now = parse_utc(stamp)
         key = "page_last_fetch:" + provider
         self.connection.execute("BEGIN IMMEDIATE")
         try:
             row = self.connection.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
-            if row and now - parse_utc(row[0]) < timedelta(hours=1):
+            if row and now - parse_utc(row[0]) < timedelta(hours=interval_hours):
                 self.connection.rollback()
                 return False
             self.connection.execute("INSERT INTO meta(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, stamp))

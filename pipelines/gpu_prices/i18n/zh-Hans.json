@@ -334,5 +334,13 @@
   "growth_feed_provider": "首次观测到供应商：{provider}（{date}）",
   "growth_feed_drop": "观测日价格下降：{model} · {kind} · {before} → {price}（{date}）",
   "growth_feed_low": "保留观测中的新低：{model} · {kind} · {before} → {price}（{date}）",
-  "growth_drop": "价格下降 · 比此前 7 日最低价的中位数低至少 10%（同一价格类型；须有全部 7 日观测）"
+  "growth_drop": "价格下降 · 比此前 7 日最低价的中位数低至少 10%（同一价格类型；须有全部 7 日观测）",
+  "note_aws": "官方 EC2 Linux 共享租用价格，覆盖两个区域，每日刷新。Spot 条目是区域最低价，并非指定可用区报价；不用于比较摘要最低价。",
+  "note_oracle": "官方每卡小时费率乘以已核实机型的 GPU 数量。OCPU 与 vCPU 分开保留；区域和库存未知。",
+  "note_ovh": "法国分支官方 EUR 目录，不含增值税。仅收 Linux 整机小时价；具体区域和库存未知，不推断本地区域或三区价格。",
+  "note_vultr": "官方小时价目录，仅接收明确的 GPU 数量。缺少地点不代表有可租库存。可抢占价格单列，未核实的虚拟 GPU 分配不纳入。",
+  "note_hetzner": "公开 GPU 专用服务器，按小时计费、有月度封顶，另收一次性设置费。起价配置明确标记，仅供展示。",
+  "note_gcp": "官方 Cloud Billing Catalog API 要求 Google Cloud 项目的 API key。完成人工设置前暂停采集。",
+  "note_alibaba_intl": "仅链接：国际站条款禁止为建立数据库而系统性提取内容及抓取；不采集或导出价格。",
+  "note_tencent_intl": "仅链接：国际版条款限制基准比较及与服务竞争的用途。匿名报价未核实，询价 API 需要签名；不采集或导出。"
 }

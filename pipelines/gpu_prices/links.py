@@ -19,6 +19,10 @@ from .catalog import AZURE_SKUS
 from .providers.registry import PROVIDERS
 
 PROVIDER_LINKS = {
+    "aws": {"name": "AWS EC2", "url": "https://aws.amazon.com/ec2/pricing/on-demand/", "ref_param": None},
+    "oracle": {"name": "Oracle Cloud", "url": "https://www.oracle.com/cloud/price-list/", "ref_param": None},
+    "ovh": {"name": "OVHcloud", "url": "https://www.ovhcloud.com/en/public-cloud/prices/", "ref_param": None},
+    "vultr": {"name": "Vultr", "url": "https://www.vultr.com/products/cloud-gpu/", "ref_param": None},
     "clore": {"name": "Clore.ai", "url": "https://clore.ai/marketplace", "ref_param": None},
     "azure": {"name": "Azure", "url": "https://azure.microsoft.com/en-us/pricing/details/virtual-machines/linux/", "ref_param": None},
     "vast": {"name": "Vast.ai", "url": "https://vast.ai/pricing", "ref_param": "ref_id"},
