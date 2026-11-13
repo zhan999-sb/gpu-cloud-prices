@@ -277,7 +277,10 @@ class WorkflowTests(unittest.TestCase):
             self.assertIn('python -m pytest ci/tests tests/test_gpu_*.py ', step)
         production = (root / '.github/workflows/gpu-site.yml').read_text(encoding='utf-8')
         self.assertIn("cron: '*/15 * * * *'", production)
-        self.assertEqual(production.count("if: success() && steps.refresh.outputs.build == 'true'"), 2)
+        # Scheduled runs follow the price/deploy-age policy; code pushes and manual runs always rebuild.
+        self.assertEqual(production.count(
+            "if: success() && (steps.refresh.outputs.build == 'true' || github.event_name != 'schedule')"), 2)
+        self.assertNotIn("if: success() && steps.refresh.outputs.build == 'true'\n", production)
         self.assertIn('ci.refresh_policy prepare-save', production)
         self.assertIn('actions/cache/save@', production)
 
