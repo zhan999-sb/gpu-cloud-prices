@@ -98,13 +98,15 @@ jobs:
 
       - name: Build production site
         id: build
-        if: success() && steps.refresh.outputs.build == 'true'
+        # Pushes only fire for code/config paths, and manual runs are deliberate: always rebuild them.
+        if: success() && (steps.refresh.outputs.build == 'true' || github.event_name != 'schedule')
         run: |
           python -m pipelines.gpu_prices.run build --db data/gpu_prices.sqlite --out ci/runtime/site --site-base-url https://gpu-cloud-prices.pages.dev --as-of '${{ steps.refresh.outputs.snapshot_at }}' 2>ci/reports/build.log | tee ci/reports/build.json
 
       - name: Audit published statistics
         id: audit
-        if: success() && steps.refresh.outputs.build == 'true'
+        # Pushes only fire for code/config paths, and manual runs are deliberate: always rebuild them.
+        if: success() && (steps.refresh.outputs.build == 'true' || github.event_name != 'schedule')
         run: |
           python -m pipelines.gpu_prices.run audit --db data/gpu_prices.sqlite --out ci/runtime/site 2>ci/reports/audit.log | tee ci/reports/audit.json
 
