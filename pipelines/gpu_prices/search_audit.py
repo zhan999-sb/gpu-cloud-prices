@@ -17,6 +17,7 @@ import zlib
 from .i18n import LANGUAGES, load_catalogs
 from .providers.registry import PROVIDERS
 from .search_specs import PAIRS, SPECS, REFERENCES
+from .guide_specs import GUIDES
 
 
 def model_copy(model, data, tr):
@@ -94,6 +95,8 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
     from .audit import Page, _eligible, _rate, _dollars, _resolve, _compare, _allowed_literals, _audit_cards
     catalogs=load_catalogs();origin=manifest['site_base_url'];slugs=manifest['model_slugs']
     entries=_entries(facts);extra=set();routes={};indexed={};parsed={}
+    from .guide_audit import snapshot as guide_snapshot, audit_page as audit_guide_page
+    guide_data=guide_snapshot(facts,errors)
     day=facts['date'];last=facts['last_updated'] or facts['built']
     from .schema import parse_utc
     tracked=sorted({r['provider'] for r in facts['all_rows'] if parse_utc(r['collected_at'])<=parse_utc(facts['built'])})
@@ -103,6 +106,9 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
     routes['/methodology']=('method',None,facts['summary']['offers'],last)
     routes['/404.html']=('404',None,0,last)
     routes['/data/']=('data',None,3 if facts['exports'] else 0,max((d['last_updated'] for d in facts['exports'].values()),default=last))
+    for slug in ('',*GUIDES):
+        key=GUIDES[slug][0] if slug else 'index'
+        routes['/guides/'+(slug+'/' if slug else '')]=('guide',slug,guide_data['counts'][key],guide_data['updated'] or facts['built'])
     for model,d in facts['models'].items():
         route='/'+slugs[model]+'/'
         routes[route]=('model',model,d['statistics']['offers'],d['last_updated'] or last)
@@ -128,7 +134,7 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
         allowed=_allowed_literals(tr,facts)|set(SPECS)
         allowed.update(tr.text('compare_label',left=a,right=b) for a,b in PAIRS.values())
         for route,(kind,subject,count,modified) in routes.items():
-            filename=_file(route,lang);is_aux=kind in {'provider','comparison','continuation','data'}
+            filename=_file(route,lang);is_aux=kind in {'provider','comparison','continuation','data','guide'}
             if is_aux:extra.add(filename);extra_html+=1
             try:
                 if parsed_main and filename in parsed_main:raw,page=parsed_main[filename]
@@ -141,8 +147,10 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
             if (page.metadata.get('robots')=='noindex')!=noindex:errors.append(filename+': thin-content/noindex mismatch')
             if not noindex:indexed[url]=(modified[:10],route,lang.code)
             expected_alts={l.code:origin+l.path(route) for l in LANGUAGES}|{'x-default':origin+route}
-            alternates=[a for tag,a in page.links if tag=='link' and a.get('rel')=='alternate']
+            alternates=[a for tag,a in page.links if tag=='link' and a.get('rel')=='alternate' and 'hreflang' in a]
             if len(alternates)!=9 or {a.get('hreflang'):a.get('href') for a in alternates}!=expected_alts:errors.append(filename+': hreflang mismatch')
+            feeds=[a for tag,a in page.links if tag=='link' and a.get('rel')=='alternate' and 'hreflang' not in a]
+            if feeds!=page.rss_links or feeds!=[{'rel':'alternate','type':'application/rss+xml','title':tr.text('growth_feed_title'),'href':origin+lang.path('/feed.xml')}]:errors.append(filename+': RSS autodiscovery mismatch')
             canonical=[a.get('href') for tag,a in page.links if tag=='link' and a.get('rel')=='canonical']
             if canonical!=[url] or page.metadata.get('og:url')!=url:errors.append(filename+': canonical mismatch')
             if len(page.h1)!=1:errors.append(filename+': expected one H1')
@@ -157,9 +165,13 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
                 expected_types=({'home':['WebSite','BreadcrumbList'],'method':['WebPage','BreadcrumbList'],
                                  '404':['WebPage','BreadcrumbList'],
                                  'data':['Dataset','BreadcrumbList'] if facts['exports'] else ['BreadcrumbList']}.get(kind,['BreadcrumbList']))
+            if kind=='guide':expected_types=(['Article'] if subject else [])+['BreadcrumbList']
             if [d.get('@type') for d in page.structured]!=expected_types:
                 errors.append(filename+': unexpected JSON-LD types/count (A-only Dataset and visible FAQ required)')
-            if kind=='model':
+            if kind=='guide':
+                expected_search,title,description=audit_guide_page(page,raw,GUIDES[subject][0] if subject else 'index',subject,
+                    guide_data,facts,tr,origin,slugs,filename,errors)
+            elif kind=='model':
                 title,intro,trend=model_copy(subject,facts['models'][subject],tr)
                 expected_search={'intro':intro,'trend':trend}
                 buyer=('seo_4090_intro' if subject=='RTX 4090 24GB' else
@@ -232,10 +244,12 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
             else:title=page.metadata.get('og:title')
             crumb_items=[(tr.text('nav_home'),'/')]+([(title,route)] if route!='/' else [])
             if kind=='continuation':crumb_items=[(tr.text('nav_home'),'/'),(subject[0],'/'+slugs[subject[0]]+'/'),(title,route)]
+            if kind=='guide':
+                crumb_items=[(tr.text('nav_home'),'/'),(tr.text('guide_index_title'),'/guides/')]+([(title,route)] if subject else [])
             expected_crumb={'@context':'https://schema.org','@type':'BreadcrumbList','inLanguage':lang.code,'url':url,'itemListElement':[{'@type':'ListItem','position':i+1,'name':label,'item':origin+lang.path(path)} for i,(label,path) in enumerate(crumb_items)]}
             crumbs=[d for d in page.structured if d.get('@type')=='BreadcrumbList']
             if crumbs!=[expected_crumb] or page.breadcrumbs!=[' / '.join(label for label,_ in crumb_items)]:errors.append(filename+': breadcrumb mismatch')
-            if is_aux:
+            if is_aux and kind!='guide':
                 if kind!='data' and any('data-growth' in a for _,a,_ in page.growth_nodes):errors.append(filename+': unexpected growth marker on auxiliary page')
                 if page.title!=tr.text('page_title',title=title,site_name=tr.text('site_name')):errors.append(filename+': auxiliary title mismatch')
                 for k,v in {'og:title':title,'twitter:title':title,'description':description,'og:description':description,'twitter:description':description}.items():
@@ -277,6 +291,10 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
                 expected_links.update(lang.path('/compare/'+slug+'/') for slug,pair in PAIRS.items() if any(subject in _family(facts['models'],f) for f in pair))
                 expected_links.update(lang.path('/'+slugs[subject]+'/offers/'+str(n+1)+'/') for n in range(1,(len(facts['models'][subject]['offers'])+11)//12))
                 if not expected_links<=hrefs:errors.append(filename+': missing related/continuation links')
+            if not any(tag=='a' and a.get('href')==lang.path('/guides/') for tag,a in page.links):
+                errors.append(filename+': missing Guides navigation')
+            if kind=='home' and not {lang.path('/guides/'+s+'/') for s in GUIDES}<={a.get('href') for tag,a in page.links if tag=='a'}:
+                errors.append(filename+': missing home Guides section')
     # Exact sitemap membership, lastmod, duplicates and reciprocal hreflang.
     ns={'s':'http://www.sitemaps.org/schemas/sitemap/0.9','x':'http://www.w3.org/1999/xhtml'}
     for filename in ['sitemap.xml']+['sitemap-'+l.code+'.xml' for l in LANGUAGES]:
@@ -319,7 +337,7 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
         _compare(json.loads((out/'indexnow-manifest.json').read_text(encoding='utf-8')),
                  {'version':1,'origin':origin,'pages':expected_hashes},'IndexNow page hashes',errors)
     except (OSError,ValueError):errors.append('IndexNow key/manifest missing or invalid')
-    return extra,dict(extra_html_pages=extra_html,additional_values_checked=additional_values,indexed_pages=len(indexed),noindex_pages=len(parsed)-len(indexed),sitemap_urls=len(indexed),language_sitemaps=8)
+    return extra,dict(extra_html_pages=extra_html,additional_values_checked=additional_values,indexed_pages=len(indexed),noindex_pages=len(parsed)-len(indexed),sitemap_urls=len(indexed),language_sitemaps=8,guide_pages=len(LANGUAGES)*(len(GUIDES)+1))
 
 
 def _audit_image(pixels, model, data, errors, filename):

@@ -86,7 +86,13 @@ class PriceStore:
                 pages INTEGER NOT NULL, records INTEGER NOT NULL, detail TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS guide_reference_models (
+                model TEXT PRIMARY KEY, parameters_billions REAL NOT NULL,
+                source_url TEXT NOT NULL
+            );
         """)
+        from .guide_specs import REFERENCE_MODELS
+        self.connection.executemany('INSERT OR IGNORE INTO guide_reference_models VALUES (?,?,?)', REFERENCE_MODELS)
         if "effective_start_date" not in {r[1] for r in self.connection.execute("PRAGMA table_info(offers)")}:
             self.connection.execute("ALTER TABLE offers ADD COLUMN effective_start_date TEXT")
         # Additive migration: retain all original keys, prices and Azure history.

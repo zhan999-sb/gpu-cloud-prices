@@ -48,3 +48,42 @@ def test_cjk_catalogues_use_native_script(lang):
         if isinstance(value, str) and _letters(value) != _letters(english.get(key, ""))
         and len(_letters(value)) > 12 and not native.search(value))
     assert not missing, f"{lang}: translated values without {lang} script: {missing}"
+
+
+def test_catalogue_keys_and_placeholder_contracts():
+    from pipelines.gpu_prices.i18n import load_catalogs, placeholders
+    catalogs = load_catalogs()
+    english = catalogs['en'].messages
+    assert len(catalogs) == 8
+    for lang, catalog in catalogs.items():
+        assert catalog.messages.keys() == english.keys(), lang
+        for key, value in catalog.messages.items():
+            assert placeholders(value) == placeholders(english[key]), (lang, key)
+            assert '\ufffd' not in value, (lang, key)
+
+
+def test_region_policy_is_not_replaced_by_statistics_copy():
+    # The old translations repeated basis and lost the access restrictions,
+    # unspecified-region rule and treatment of unrecognized identifiers.
+    for lang in LANGS:
+        messages = _load(lang)
+        assert messages['method_regions'] != messages['basis'], lang
+        assert 'Jio' in messages['method_regions'], lang
+
+
+def test_english_fallbacks_are_only_native_words_names_and_units():
+    # These are also valid local words or technical names, never untranslated
+    # sentences. A new English sentence in another locale must be translated.
+    common = {'page_title', 'chart_point', 'sku', 'vcpu', 'gpu_1', 'spec_vram', 'spec_fp16', 'spec_bf16'}
+    allowed = {
+        'zh-Hans': set(), 'ja': {'spot'}, 'ko': set(),
+        'de': {'source_name', 'spot', 'region', 'minimum', 'median', 'maximum', 'ram', 'median_n', 'partner_heading'},
+        'fr': {'spot', 'minimum', 'maximum', 'ram', 'source', 'scope_instance', 'billing_instance_minute', 'interruptible', 'spec_conditions'},
+        'es': {'spot', 'ram'}, 'pt-BR': {'spot', 'ram'},
+    }
+    english = _load('en')
+    for lang in LANGS:
+        if lang == 'en':
+            continue
+        identical = {key for key, value in _load(lang).items() if value == english[key]}
+        assert identical <= common | allowed[lang], (lang, identical - common - allowed[lang])

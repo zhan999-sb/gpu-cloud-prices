@@ -344,7 +344,7 @@ def test_site_from_fixtures_cheapest_html_json_and_history(tmp_path):
                       offer(collected_at="2026-11-11T08:00:00Z", price_per_hour=40, price_per_gpu_hour=5)])
         store.record_run(provider="azure", started_at=STAMP, status="limited", pages=3, records=3)
         result = build_site(store, tmp_path, today=TODAY, built_at=STAMP)
-    assert result["offers_today"] == 2 and result["html_pages"] == 11 * len(LANGUAGES)
+    assert result["offers_today"] == 2 and result["html_pages"] == 17 * len(LANGUAGES)
     index = (tmp_path / "index.html").read_text(encoding="utf-8")
     assert '/statistics/cheapest/on_demand" data-format="money">$3.00</span>' in index
     assert '/statistics/cheapest/spot" data-format="money">$1.00</span>' in index
@@ -567,7 +567,7 @@ class Metadata(HTMLParser):
             self.meta[attrs.get("name", attrs.get("property"))] = attrs.get("content")
         if tag == "link" and attrs.get("rel") == "canonical":
             self.canonicals.append(attrs["href"])
-        if tag == "link" and attrs.get("rel") == "alternate":
+        if tag == "link" and attrs.get("rel") == "alternate" and "hreflang" in attrs:
             self.alternates.append((attrs["hreflang"], attrs["href"]))
         if tag == "title" or (tag == "script" and attrs.get("type") == "application/ld+json"):
             self.active, self.buffer = tag, []
@@ -641,7 +641,12 @@ def test_seo_sharing_structured_data_and_sitemap(tmp_path):
     sitemap = ET.fromstring((tmp_path / "sitemap.xml").read_text(encoding="utf-8"))
     urls = {entry.find("s:loc", namespace).text: entry.find("s:lastmod", namespace).text for entry in sitemap}
     assert urls == {origin + lang.path(route): TODAY for lang in LANGUAGES
-                    for route in ("/", "/methodology", "/data/", "/h100-sxm-80gb/", "/providers/azure/")}
+                    for route in ("/", "/methodology", "/data/", "/h100-sxm-80gb/", "/providers/azure/",
+                                  "/guides/", "/guides/choose-gpu-cloud-llm-inference/",
+                                  "/guides/per-gpu-hour-vs-instance/", "/guides/gpu-cloud-price-glossary/",
+                                  "/guides/cheapest-gpu-per-vram-gb/")}
+    # A single matched Spot pair cannot bypass the guide's thin-content guard.
+    assert all(origin+lang.path('/guides/spot-vs-on-demand/') not in urls for lang in LANGUAGES)
     assert set(result["sitemap_urls"]) == set(urls)
     assert (tmp_path / "robots.txt").read_text() == f"User-agent: *\nAllow: /\n\nSitemap: {origin}/sitemap.xml\n"+''.join(f'Sitemap: {origin}/sitemap-{l.code}.xml\n' for l in LANGUAGES)
     assert "Page not found" in (tmp_path / "404.html").read_text(encoding="utf-8")
@@ -816,6 +821,8 @@ def assert_multilingual_site(root, origin, models):
     routes = {"/", "/methodology", "/404.html", "/data/"} | {"/" + slug + "/" for slug in models.values()}
     from pipelines.gpu_prices.search_specs import PAIRS
     routes |= ({'/providers/azure/'} if models else set()) | {'/compare/'+slug+'/' for slug in PAIRS}
+    from pipelines.gpu_prices.guide_specs import GUIDES
+    routes |= {'/guides/'} | {'/guides/'+slug+'/' for slug in GUIDES}
     all_pages = {origin + lang.path(route): (lang, route) for lang in LANGUAGES for route in routes}
     assert len(list(root.rglob("*.html"))) == len(all_pages) + len(models) * len(LANGUAGES)
     parsed, metadata, contact_bytes = {}, {}, set()
@@ -914,7 +921,7 @@ def test_every_language_page_reciprocal_metadata_links_sitemap_and_contact(tmp_p
         store.record_run(provider="azure", started_at=STAMP, status="limited", pages=3, records=6)
         result = build_site(store, tmp_path, today=TODAY, built_at=STAMP)
     assert_multilingual_site(tmp_path, origin, model_slugs(names))
-    assert result["html_pages_by_language"] == {lang.code: 17 for lang in LANGUAGES}
+    assert result["html_pages_by_language"] == {lang.code: 23 for lang in LANGUAGES}
     assert len(list((tmp_path / "data").glob("*.json"))) == len(names) + 1
     catalogs = load_catalogs()
     for lang in LANGUAGES:
@@ -1071,7 +1078,7 @@ def test_headlines_keep_demand_and_spot_separate_and_audit_raw_precision(tmp_pat
         store.upsert(values)
         result = build_site(store, tmp_path, today=TODAY, built_at=STAMP)
         assert result["audit"]["status"] == "passed"
-        assert audit_site(store.connection, tmp_path)["html_pages"] == 88
+        assert audit_site(store.connection, tmp_path)["html_pages"] == 136
     text = (tmp_path / "h100-sxm-80gb/index.html").read_text(encoding="utf-8")
     page = Metadata(text)
     assert "$2.27" in page.meta['description'] and "H100 Cloud Rental Prices" in page.titles[0]

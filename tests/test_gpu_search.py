@@ -136,7 +136,9 @@ def test_independent_audit_rejects_search_corruption(search_site,tmp_path,damage
         if damage=='intro':text=text.replace('minimum $1.00, median $4.50','minimum $0.10, median $4.50',1)
         elif damage=='trend':text=text.replace('-90.00%','-99.00%',1)
         elif damage=='hidden-faq':text=text.replace('data-faq="0"','hidden data-faq="0"',1)
-        elif damage=='faq-question':text=text.replace('What is the cheapest H100','What is the most expensive H100',1)
+        elif damage=='faq-question':
+            question=load_catalogs()['en'].text('faq_cheapest_q',model='H100 SXM 80GB')
+            text=text.replace(question,'Incorrect FAQ question',1)
         elif damage=='provider-count':text=text.replace('Current listings: 6','Current listings: 60',1)
         elif damage=='provider-min':text=text.replace('data-format="money">$1.00','data-format="money">$0.10',1)
         elif damage=='spec':text=text.replace('data-format="number">1792','data-format="number">1793',1)

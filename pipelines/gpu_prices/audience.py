@@ -68,7 +68,9 @@ def embed_page(model, data, slug, origin, tr):
     result = ('<!DOCTYPE html><html lang="' + tr.language.code + '"><head><meta charset="utf-8"/>'
               '<meta name="viewport" content="width=device-width,initial-scale=1"/>'
               '<meta name="robots" content="noindex"/><title>' + escape(model) + ' · ' + tr.html('site_name')
-              + '</title><style>' + EMBED_CSS + '</style></head><body>' + body + '</body></html>\n')
+              + '</title><link rel="alternate" type="application/rss+xml" title="' + tr.html('growth_feed_title')
+              + '" href="' + escape(origin + tr.language.path('/feed.xml'), quote=True)
+              + '"/><style>' + EMBED_CSS + '</style></head><body>' + body + '</body></html>\n')
     if len(result.encode('utf-8')) >= 15_000:
         raise ValueError('Embed HTML must be smaller than 15 KB')
     return result
@@ -125,6 +127,7 @@ def data_body(index, tr):
     body += '<p data-growth="creator">'+tr.html('seo_creator')+': <a href="'+escape(index['attribution_url'].removesuffix('data/'),quote=True)+'">GPU Price Index</a></p>'
     body += '<p data-growth="temporal">'+tr.html('seo_temporal')+': '+escape(index['temporal_coverage'] or tr.text('not_observed'))+'</p>'
     body += '<p><a href="/data/latest.json">' + tr.html('growth_data_index') + '</a></p>'
+    body += '<p><a data-mirror="huggingface" href="https://huggingface.co/datasets/ComputeTicks/gpu-cloud-prices" rel="noopener">' + tr.html('growth_data_mirror') + '</a></p>'
     body += '<h2>' + tr.html('growth_fields_title') + '</h2>'
     for key, fields in groups:
         body += '<p>' + tr.html(key) + '</p><p><code>' + escape(fields) + '</code></p>'

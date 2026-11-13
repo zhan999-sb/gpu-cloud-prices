@@ -23,7 +23,8 @@ from .monthly import monthly_quotes
 from .providers.registry import PROVIDERS
 from .partners import surflare
 from .models import category, popular_rank, headline_order, POPULAR, CATEGORIES, model_family
-from . import search, audience
+from . import search, audience, guides
+from .guide_specs import GUIDES, reference_rows
 from .search_specs import PAIRS, REFERENCES, SPECS
 
 DEFAULT_OUT = ROOT / "site_i18n_preview"
@@ -35,6 +36,7 @@ PAGE = Template("""<!DOCTYPE html>
 <html lang="$lang" dir="ltr"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
 <meta name="description" content="$description"/><title>$page_title</title>
 <link rel="canonical" href="$canonical"/>
+<link rel="alternate" type="application/rss+xml" title="$feed_label" href="$feed_url"/>
 $alternates<meta property="og:type" content="website"/><meta property="og:site_name" content="$site_name"/>
 <meta property="og:title" content="$title"/><meta property="og:description" content="$description"/><meta property="og:url" content="$canonical"/>
 <meta name="theme-color" content="#185bc0"/><link rel="icon" href="$origin/favicon.svg" type="image/svg+xml"/><meta property="og:image" content="$social_image"/>
@@ -62,7 +64,7 @@ def model_slugs(models) -> dict[str, str]:
     model's unambiguous URL (e.g. 'GPU 2' alongside two variants of 'GPU').
     """
     ordered = sorted(set(models), key=lambda model: (model.casefold(), model))
-    reserved = {"data", "embed", "feed", "latest", "index", "methodology", "404", "robots", "sitemap", "providers", "compare", "social"} | {lang.prefix for lang in LANGUAGES if lang.prefix}
+    reserved = {"guides", "data", "embed", "feed", "latest", "index", "methodology", "404", "robots", "sitemap", "providers", "compare", "social"} | {lang.prefix for lang in LANGUAGES if lang.prefix}
     natural = {model_slug(model) for model in ordered}
     used, result = set(reserved), {}
     for model in ordered:
@@ -132,7 +134,8 @@ def _page(title, body, updated, built, *, origin, route, tr, description, struct
                            generated=tr.rich("generated", date=_timestamp(built, tr, "/built")), css=CSS,
                            data_path=tr.language.path('/data/'), data_label=tr.html('growth_data_title'),
                            feed_path=tr.language.path('/feed.xml'), feed_label=tr.html('growth_feed_title'),
-                           partner_footer=_partner(tr, compact=True),
+                           feed_url=escape(origin+tr.language.path('/feed.xml'), quote=True),
+                           partner_footer=_partner(tr, compact=True)+'<p><a href="'+tr.language.path('/guides/')+'">'+tr.html('guide_index_title')+'</a></p>',
                            footer_source=tr.rich("footer_source", source='<a href="' + SOURCE_DOC + '">' + tr.html("source_name") + '</a>'))
 
 
@@ -199,7 +202,7 @@ def _stat(path, value, fmt="money", tag="span"):
         match = re.search(r'\b\d+(?:\.\d+)?\s*(?:GB|GiB)\b', value, re.I)
         formatted = match.group() if match else '—'
     else:
-        formatted = _money(value) if fmt == "money" else f"{value:.2f}%" if fmt == "percent" else f"{value:g}" if fmt == "number" else str(value)
+        formatted = f'{value:.6f}' if fmt == 'precise' else _money(value) if fmt == "money" else f"{value:.2f}%" if fmt == "percent" else f"{value:g}" if fmt == "number" else str(value)
     return '<' + tag + ' data-stat="' + escape(path, quote=True) + '" data-format="' + fmt + '">' + escape(formatted) + '</' + tag + '>'
 
 
@@ -603,6 +606,7 @@ def _home(offers, models, slugs, today, coverage, tr, model_data, monthly=()):
         stats=model_data[m]['statistics'];base=_pointer('models',m,'statistics')
         summary.append('<tr>'+_cell(m)+''.join('<td>'+_value(base+'/cheapest/'+k,stats['cheapest'][k],tr)+' '+tr.html('gpu_hour')+'</td>' for k in ('on_demand','spot'))+'<td>'+_discount(stats,base,tr)+'</td></tr>')
     body+='<details class="comparison"><summary>'+tr.html('how_compare')+'</summary><p>'+tr.html('basis')+'</p><p>'+tr.html('maximum_def')+'</p>'+_table([tr.text(k) for k in ('gpu_model','cheapest_on_demand','cheapest_spot','spot_discount')],summary,tr.text('home_caption'))+coverage+'<p><a href="'+tr.language.path('/methodology')+'">'+tr.html('methodology')+'</a></p></details>'
+    body+='<section aria-labelledby="guides-heading"><h2 id="guides-heading"><a href="'+tr.language.path('/guides/')+'">'+tr.html('guide_index_title')+'</a></h2><p>'+tr.html('guide_index_intro')+'</p><ul>'+''.join('<li><a href="'+tr.language.path('/guides/'+slug+'/')+'">'+tr.html('guide_'+key+'_title')+'</a></li>' for slug,(key,_) in GUIDES.items())+'</ul></section>'
     numbers=dict(count=tr.quantity('offer_count',len(selected)),models=tr.quantity('model_count',len(active)),regions=tr.quantity('region_count',len({o.region for o in selected})),date=today)
     return body,tr.text('home_title',**numbers),tr.text('home_description',**numbers)
 
@@ -842,6 +846,17 @@ def build_site(store: PriceStore, out: str | Path = DEFAULT_OUT, *, today: str |
             title,description,body,count=_comparison_page(slug,model_data,slugs,today,tr)
             pages[_page_file(lang.path(route))]=_page(title,body,last_updated,built,origin=origin,route=route,tr=tr,description=description,noindex=count<3)
             if count>=3:sitemap_entries[lang.path(route)]=(last_updated or built,route)
+        guide_data = guides.snapshot(model_data, reference_rows(store.connection))
+        for slug in ('', *GUIDES):
+            route = '/guides/' + (slug+'/' if slug else '')
+            title,description,body,count = guides.render(slug, guide_data, slugs, tr, stat=_stat, table=_table, card=_offer_card)
+            updated = guide_data['updated']
+            crumbs = [(tr.text('nav_home'), '/'), (tr.text('guide_index_title'), '/guides/')]
+            if slug: crumbs.append((title, route))
+            structured = guides.article(slug,title,description,updated,tr,origin) if slug else None
+            pages[_page_file(lang.path(route))] = _page(title,body,updated,built,origin=origin,route=route,tr=tr,
+                description=description,structured=structured,noindex=count<3,crumbs=crumbs)
+            if count>=3: sitemap_entries[lang.path(route)]=(updated or built,route)
         method_title = tr.text("method_title")
         method_description = tr.text("method_description", count=tr.quantity("offer_count", len([o for o in offers if eligible(o)])),
                                      models=tr.quantity("model_count", len({o.gpu_model for o in offers if eligible(o)})),

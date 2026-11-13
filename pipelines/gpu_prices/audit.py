@@ -181,7 +181,8 @@ def _snapshot(connection, day, generated):
     monthly = []
     if connection.execute("SELECT 1 FROM sqlite_master WHERE name='monthly_quotes'").fetchone():
         monthly = [json.loads(r[0]) for r in connection.execute('SELECT payload FROM monthly_quotes WHERE collected_at=(SELECT MAX(collected_at) FROM monthly_quotes WHERE collected_at<=?) ORDER BY sku',(stamp(generated).isoformat(timespec='microseconds').replace('+00:00','Z'),))]
-    return {'monthly':monthly,'models':models,'exports':exports,'coverage':coverage,'date':day,'built':generated,'run':run,
+    references = _rows(connection, 'SELECT model,parameters_billions,source_url FROM guide_reference_models ORDER BY parameters_billions,model') if connection.execute("SELECT 1 FROM sqlite_master WHERE name='guide_reference_models'").fetchone() else []
+    return {'guide_references':references,'monthly':monthly,'models':models,'exports':exports,'coverage':coverage,'date':day,'built':generated,'run':run,
             'summary':{'models':len({r['gpu_model'] for r in good}),'offers':len(good),'regions':len({r['region'] for r in good}),
                        'providers':len({r['provider'] for r in good}), 'updated':max((r['collected_at'] for r in good), default=None)},
             'all_rows':rows,'last_updated':max((r['collected_at'] for r in observed_rows),default=None),
@@ -233,12 +234,15 @@ class Page(HTMLParser):
         self.growth_nodes=[]
         self.price_blocks=[]
         self.price_block_headings=[]
+        self.rss_links, self.mirrors = [], []
         self.table_rows,self.current_row=[],None
         self.feed(text)
         self.close()
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
+        if tag == 'link' and a.get('rel') == 'alternate' and a.get('type') == 'application/rss+xml' and any(f[0] == 'head' for f in self.stack):
+            self.rss_links.append(a)
         if tag=='tr':self.current_row=[]
         if 'data-price-block' in a:self.price_blocks.append([a['data-price-block'],[]])
         if tag in {'a','link','script'}:self.links.append((tag,a))
@@ -277,6 +281,8 @@ class Page(HTMLParser):
             return
         kind, a, chunks = self.stack.pop()
         text = ''.join(chunks)
+        if kind == 'a' and 'data-mirror' in a:
+            self.mirrors.append((a, text))
         if 'data-growth' in a or kind in {'textarea','style'}:
             self.growth_nodes.append((kind,a,text))
         if kind=='td' and self.current_row is not None:self.current_row.append(text)
@@ -288,7 +294,7 @@ class Page(HTMLParser):
             block=next((f[1]['data-price-block'] for f in reversed(self.stack) if 'data-price-block' in f[1]),None)
             if block is not None and self.card is None:self.price_block_headings.append([block,text])
         if kind=='summary' and any(f[1].get('class')=='faq' for f in self.stack):self.faq_questions.append(text)
-        if ('data-search' in a or 'data-faq' in a or 'data-growth' in a or 'data-price-block' in a or a.get('class')=='minimum-instance') and any('hidden' in attrs or 'display:none' in attrs.get('style','').replace(' ','') for attrs in [a]+[f[1] for f in self.stack]):raise AuditError('Audited content must be visible')
+        if ('data-guide' in a or 'data-stat' in a or 'data-search' in a or 'data-faq' in a or 'data-growth' in a or 'data-price-block' in a or 'data-mirror' in a or a.get('class')=='minimum-instance') and any('hidden' in attrs or attrs.get('aria-hidden')=='true' or re.search(r'(?:display:none|visibility:hidden)',re.sub(r'\s+','',attrs.get('style','')).lower()) for attrs in [a]+[f[1] for f in self.stack]):raise AuditError('Audited content must be visible')
         if 'data-search' in a:
             key=a['data-search']
             if key in self.search_values:raise AuditError('Duplicate search content marker: '+key)

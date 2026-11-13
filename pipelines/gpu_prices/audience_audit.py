@@ -124,6 +124,8 @@ def audit_audience(facts, manifest, out, errors, parsed_main):
             if found!=[r['url'] for r in expected_index['exports']]:errors.append(datafile+': export list mismatch')
             if not any(a.get('href')==expected_index['license'] and a.get('rel')=='license noopener' for a in links):errors.append(datafile+': missing licence link')
             if not any(a.get('href')=='/data/latest.json' for a in links):errors.append(datafile+': missing latest index')
+            mirrors=[a for a in links if a.get('data-mirror')=='huggingface']
+            if mirrors!=[{'data-mirror':'huggingface','href':'https://huggingface.co/datasets/ComputeTicks/gpu-cloud-prices','rel':'noopener'}] or page.mirrors!=[(mirrors[0],tr.text('growth_data_mirror'))]:errors.append(datafile+': visible Hugging Face mirror mismatch')
             # Every public Offer field is documented, never a B/C schema preview.
             from .audit import FIELDS
             if any(field not in page.text for field in FIELDS):errors.append(datafile+': undocumented export field')
@@ -189,12 +191,14 @@ def audit_audience(facts, manifest, out, errors, parsed_main):
                 metas=[a for tag,a in tags if tag=='meta']
                 valid_attrs=all((a=={'lang':lang.code} if tag=='html' else
                     a in ({},{'class':'price'}) if tag=='p' else not a)
-                    for tag,a in tags if tag not in {'a','meta'})
+                    for tag,a in tags if tag not in {'a','meta','link'})
+                feeds=[a for tag,a in tags if tag=='link']
                 if (widget.text.removesuffix('\n')!=visible or widget.h1!=[model] or widget.title!=model+' · '+tr.text('site_name')
                     or widget.metadata.get('robots')!='noindex' or size>=15_000 or styles!=[css]
                     or not valid_attrs or metas!=[{'charset':'utf-8'},{'name':'viewport','content':'width=device-width,initial-scale=1'},{'name':'robots','content':'noindex'}]
                     or links!=[{'href':origin+lang.path('/'+slug+'/'),'target':'_blank','rel':'nofollow noopener'}]
-                    or any(tag not in {'html','head','meta','title','style','body','h1','p','small','a'} or 'style' in a or 'hidden' in a or any(k.startswith('on') for k in a) for tag,a in tags)):
+                    or feeds!=widget.rss_links or feeds!=[{'rel':'alternate','type':'application/rss+xml','title':tr.text('growth_feed_title'),'href':origin+lang.path('/feed.xml')}]
+                    or any(tag not in {'html','head','meta','link','title','style','body','h1','p','small','a'} or 'style' in a or 'hidden' in a or any(k.startswith('on') for k in a) for tag,a in tags)):
                     errors.append(filename+': widget price/labels/security/size mismatch')
                 checked+=1
             except (OSError,ValueError):errors.append(filename+': missing/invalid embed')

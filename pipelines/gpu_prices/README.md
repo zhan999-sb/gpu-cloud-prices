@@ -327,3 +327,55 @@ replays `--as-of 2026-11-12T17:43:29.976595Z` from the read-only database. This 
 an existing observation snapshot, not a new collection. Logs, final source/data
 hashes, size/count evidence and the delivery report stay in `runtime/b16/`.
 No push or deployment is part of these checks.
+
+### Evergreen guides (b23)
+
+`/guides/` and five article routes are generated in all eight languages.
+The footer links to the guide index; the articles link to their exact-model,
+provider and comparison pages. Visible articles carry Article and hierarchical
+BreadcrumbList JSON-LD. There is no synthetic FAQ markup. Root and localized
+sitemaps include only articles with sufficient current eligible observations.
+
+The same whole-GPU, USD, current-day, effective-date and provider-health rules
+apply. Standard/unspecified regions and excluded/unknown tax bases qualify;
+fractional, component-only, included-tax, stale and from-price records do not.
+Price types remain separate. The per-GB table uses only explicit decimal GB
+capacity in the canonical database read view; unknown capacity or GiB-only
+unknown names have no inferred denominator. Popular models appear first, with
+the cheapest observed quote for each exact model/type and its full offer card.
+
+Spot discounts use matching model/provider/SKU/region/count/fraction/scope/
+currency/tax/CPU/RAM/minimum-duration pairs. Compute each pair's percentage
+reduction, then take its model's median. Price medians use that same matched
+cohort; their ratio is not the discount statistic. Negative discounts remain
+negative. No matches means unavailable, not an estimated or regional-floor
+discount. At least three matched pairs are required to index the Spot guide.
+Other guides require three relevant eligible offers; the memory guide also
+requires the cited model references. Missing-data articles stay available with
+noindex, outside every sitemap and the IndexNow manifest.
+
+Writable database opens add `guide_reference_models` separately from market
+observations. These are the official model card's nominal parameter counts,
+not collected rental data or measured runtime memory. Build-time weight-storage
+arithmetic reads those rows: nominal parameter count times bytes per weight.
+The page distinguishes ideal weight-only decimal GB from runtime requirements,
+including quantization metadata, KV cache, activations and concurrency. Existing
+read-only databases without the additive table are supported without a guessed
+reference fallback. To populate references, open an isolated DB copy with
+`PriceStore` once before a read-only build. Original observations need no edits.
+
+`guide_audit.py` selects and recomputes facts from the independent SQL snapshot.
+It does not import the guide renderer, statistics or store helpers. It verifies
+reviewed reference rows, every table cell and numeric marker, complete offer
+cards, honesty labels, visible explanatory text, official sources, internal
+links, Article metadata, breadcrumbs, thin-content decisions and sitemap
+membership. The source list contains official provider/model documentation;
+no throughput or interruption-frequency estimate is inferred from price data.
+
+Task-local verification is in `runtime/b23/`. Its pytest entry point runs in a
+single process with plugin autoload/cache disabled and fresh temporary roots.
+On this restricted Windows token, it replaces only newly requested private
+temporary-directory modes with inherited workspace ACLs for the local test
+process. It does not edit existing ACLs or machine settings. Use fresh phase
+names with `verify.py focusedN` or `verify.py testsN`; `build` and `audit` use
+the isolated b21 database copy and the requested public canonical origin.

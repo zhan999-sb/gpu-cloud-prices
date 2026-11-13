@@ -89,6 +89,71 @@ def test_dataset_matches_visible_compilation_dates_and_tier_a_files(seo_site):
             assert all(o['tier']=='A' and o['export_allowed'] for o in export['offers'])
 
 
+def test_rss_discovery_on_every_html_and_visible_dataset_mirror(seo_site):
+    _, folder, _ = seo_site
+    catalogs = load_catalogs()
+    manifest = json.loads((folder/'gpu-prices-manifest.json').read_text(encoding='utf-8'))
+    by_prefix = {lang.prefix: lang for lang in LANGUAGES}
+    for filename in manifest['files']:
+        if not filename.endswith('.html'):
+            continue
+        parts = filename.split('/')
+        # Embeds use /embed/<locale>/<model>.html; other pages /<locale>/…
+        candidate = parts[1] if parts[0] == 'embed' else parts[0]
+        lang = by_prefix.get(candidate, LANGUAGES[0])
+        tr = catalogs[lang.code]
+        page = Page((folder/filename).read_text(encoding='utf-8'))
+        assert page.rss_links == [{'rel': 'alternate', 'type': 'application/rss+xml',
+            'title': tr.text('growth_feed_title'), 'href': ORIGIN+lang.path('/feed.xml')}], filename
+        assert (folder/lang.prefix/'feed.xml').is_file()
+        if not filename.startswith('embed/'):
+            assert len([a for tag, a in page.links if tag == 'link' and 'hreflang' in a]) == 9
+    for lang in LANGUAGES:
+        page = Page((folder/lang.prefix/'data/index.html').read_text(encoding='utf-8'))
+        assert page.mirrors == [({'data-mirror': 'huggingface',
+            'href': 'https://huggingface.co/datasets/ComputeTicks/gpu-cloud-prices',
+            'rel': 'noopener'}, catalogs[lang.code].text('growth_data_mirror'))]
+        assert not any(d.get('@type') == 'FAQPage' for d in page.structured)
+
+
+@pytest.mark.parametrize('filename,damage', [
+    ('index.html', 'rss-remove'), ('zh/index.html', 'rss-locale'),
+    ('providers/azure/index.html', 'rss-title'),
+    ('compare/h100-vs-a100/index.html', 'rss-type'),
+    ('guides/index.html', 'rss-body'), ('ja/404.html', 'rss-remove'),
+    ('h100-sxm-80gb/index.html', 'rss-duplicate'),
+    ('embed/ko/h100-sxm-80gb.html', 'rss-remove'),
+    ('data/index.html', 'mirror-remove'), ('zh/data/index.html', 'mirror-label'),
+    ('ja/data/index.html', 'mirror-url'), ('ko/data/index.html', 'mirror-hidden'),
+])
+def test_audit_rejects_discovery_and_mirror_corruption(seo_site, filename, damage):
+    store, folder, _ = seo_site
+    path = folder/filename
+    original = path.read_text(encoding='utf-8')
+    if damage.startswith('rss-'):
+        link = re.search(r'<link rel="alternate" type="application/rss\+xml"[^>]+/>', original)[0]
+        changed = {'rss-remove': '', 'rss-locale': link.replace('/zh/feed.xml', '/feed.xml'),
+            'rss-title': re.sub(r'title="[^"]+"', 'title="Wrong title"', link),
+            'rss-type': link.replace('application/rss+xml', 'text/html'),
+            'rss-body': '', 'rss-duplicate': link+link}[damage]
+        raw = original.replace(link, changed, 1)
+        if damage == 'rss-body':
+            raw = raw.replace('</body>', link+'</body>', 1)
+    else:
+        link = re.search(r'<a data-mirror="huggingface"[^>]+>[^<]+</a>', original)[0]
+        changed = {'mirror-remove': '', 'mirror-label': re.sub(r'>[^<]+</a>', '>Unrelated</a>', link),
+            'mirror-url': link.replace('ComputeTicks', 'WrongOwner'),
+            'mirror-hidden': link.replace('<a ', '<a hidden ', 1)}[damage]
+        raw = original.replace(link, changed, 1)
+    assert raw != original
+    try:
+        path.write_text(raw, encoding='utf-8')
+        with pytest.raises(AuditError):
+            audit_site(store.connection, folder)
+    finally:
+        path.write_text(original, encoding='utf-8')
+
+
 @pytest.mark.parametrize('damage',[
     'name','description','license','creator','temporalCoverage','distribution','missing-dataset',
     'visible-license','visible-creator','visible-time','hidden-time','buyer-intro','variant','price-block',
