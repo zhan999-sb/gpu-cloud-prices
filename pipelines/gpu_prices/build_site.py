@@ -188,6 +188,9 @@ def _stat(path, value, fmt="money", tag="span"):
     if fmt.startswith("instance-"):
         amount = value['price_per_hour'] * ((value['gpu_count'] or 1) if value['price_scope'] == 'per_gpu' else 1)
         formatted = _money(amount) if fmt == 'instance-money' else f'{amount:g}'
+    elif fmt.startswith('minimum-charge-'):
+        amount = value['price_per_hour'] * (value['gpu_count'] if value['price_scope'] == 'per_gpu' else 1) * value['minimum_billing_seconds'] / 3600
+        formatted = _money(amount) if fmt.endswith('money') else f'{amount:g}'
     elif fmt == 'date':
         formatted = value[:10]
     elif fmt == 'clock':
@@ -411,6 +414,16 @@ def _offer_card(row, path, tr, *, group='offers', model_url=None, drop_badge='')
     if o['original_currency'] and o['original_currency'] != o['currency']:
         body+='<p class="native-price">'+tr.html('original_hourly')+': '+escape(o['original_currency'])+' '+_stat(path+'/original_price',o['original_price'],'number')+'/hr · '+tr.html('scope_'+o['price_scope'])+'</p>'
     if o['currency'] != 'USD':body+='<p class="unit">'+tr.html('no_usd_conversion')+'</p>'
+    body += '<p class="minimum-instance">' + tr.html('seo_minimum_instance') + ': '
+    if o['price_scope']=='gpu_component' or (o['price_scope']=='per_gpu' and o['gpu_count'] is None):
+        body += tr.html('seo_instance_unknown')
+    else:
+        body += escape(o['currency'])+' '+_stat(path,o,'instance-money' if o['currency']=='USD' else 'instance-number')+'/hr'
+        if o['minimum_billing_seconds'] is not None:
+            body += ' · '+tr.html('seo_billing_floor')+': '+escape(o['currency'])+' '+_stat(path,o,'minimum-charge-money' if o['currency']=='USD' else 'minimum-charge-number')+' / '+_stat(path+'/minimum_billing_seconds',o['minimum_billing_seconds'],'number')+' '+tr.html('seo_seconds')
+        else:
+            body += ' · '+tr.html('seo_billing_unknown')
+    body += '</p>'
     body+='</div>'
     body+='<div class="offer-action">'+_outbound(o['provider'],o['sku'],o['region'],o['price_type'],o['gpu_model'],tr)
     if model_url:body+='<a class="model-link" href="'+model_url+'">'+tr.html('see_offers')+'</a>'
@@ -425,7 +438,7 @@ def _offer_card(row, path, tr, *, group='offers', model_url=None, drop_badge='')
     return body+'<a href="'+escape(o['source_url'],quote=True)+'">'+tr.html('api_record')+'</a></details></div></article>'
 
 
-def _offer_browser(entries, tr, *, cap=None):
+def _offer_browser(entries, tr, *, cap=None, separate_types=False):
     """entries retain their original model index for independent SQLite audits."""
     body='<section data-offer-browser><h2 id="offers">'+tr.html('offers_caption')+'</h2>'+_filters([o for _,o in entries],tr)
     # Keep fractional offers discoverable even when the whole-GPU list is capped.
@@ -451,8 +464,13 @@ def _offer_browser(entries, tr, *, cap=None):
             # Separate memory bands so filtering/sorting preserves the priority
             # of 12 GB+ models within the consumer category.
             bands = [[e for e in grouped if _small_consumer(e[1])==small] for small in (False,True)] if key=='consumer' else [grouped]
+            if separate_types:
+                kinds=('on_demand','spot')+tuple(sorted({e[1]['price_type'] for e in grouped}-{'on_demand','spot'}))
+                bands = [[e for e in grouped if e[1]['price_type']==kind] for kind in kinds]
             for band in bands:
+                if band and separate_types:body+='<section data-price-block="'+band[0][1]['price_type']+'"><h3>'+tr.html(band[0][1]['price_type'])+'</h3>'
                 if band:body+='<div class="offer-list" data-offer-list>'+''.join(_offer_card(o,p,tr,group='fractional' if fractional else 'offers') for p,o in band)+'</div>'
+                if band and separate_types:body+='</section>'
             if key:body+='</details>' if key=='legacy' else '</section>'
     return body+'<p class="notice" data-no-results hidden>'+tr.html('no_results')+'</p></section>'+FILTER_JS
 
@@ -603,10 +621,17 @@ def _model(model, data, today, coverage, tr, origin, route, export_path, export_
     base=_pointer('models',model)
     title=search.title(model,data,tr)
     description=title+'. '+search.intro(data,tr)
+    buyer = search.buyer_key(model)
+    if buyer:description=tr.text(buyer)+' '+description
     body='<section class="hero"><h1>'+escape(title)+'</h1><p data-search="intro">'+escape(search.intro(data,tr))+'</p><p data-search="trend">'+escape(search.trend_text(data,tr))+'</p><p>'+tr.html('search_limits')+'</p></section>'
+    if buyer:
+        body += '<p data-search="buyer-intro">'+tr.html(buyer)+'</p>'
+    separated = buyer in {'seo_h100_intro','seo_a100_intro'}
+    if separated:
+        body += '<p data-search="variant">'+tr.html('seo_variant',model=model)+'</p>'
     if not current:body+='<p class="notice">'+tr.html('stale')+'</p>'
     else:
-        body+=_offer_browser(search.model_chunk(data,model),tr)
+        body+=_offer_browser(search.model_chunk(data,model),tr,separate_types=separated)
         body+=search.pagination(model,len(current),route.strip('/'),tr)
         body+='<details class="comparison"><summary>'+tr.html('how_compare')+'</summary>'+_price_cards(model,stats,tr)+'<p>'+tr.html('basis')+'</p>'+coverage+'</details>'
         body+=_model_content(model,stats,today,tr)
@@ -786,7 +811,7 @@ def build_site(store: PriceStore, out: str | Path = DEFAULT_OUT, *, today: str |
         data_route='/data/'
         data_updated=max((d['last_updated'] for d in exports.values()),default=None)
         pages[_page_file(lang.path(data_route))]=_page(tr.text('growth_data_title'),audience.data_body(index,tr),data_updated,built,
-            origin=origin,route=data_route,tr=tr,description=tr.text('growth_data_intro'),noindex=not bool(exports))
+            origin=origin,route=data_route,tr=tr,description=tr.text('growth_data_intro'),structured=audience.dataset(index,tr,origin) if exports else None,noindex=not bool(exports))
         if exports:sitemap_entries[lang.path(data_route)]=(data_updated or built,data_route)
         for model in models:
             pages[audience.embed_path(slugs[model],lang).lstrip('/')]=audience.embed_page(model,model_data[model],slugs[model],origin,tr)
@@ -803,7 +828,7 @@ def build_site(store: PriceStore, out: str | Path = DEFAULT_OUT, *, today: str |
             for number in range(1,(len(data['offers'])+search.OFFER_PAGE_SIZE-1)//search.OFFER_PAGE_SIZE):
                 subroute=route+'offers/'+str(number+1)+'/'
                 sub_title=tr.text('offer_page',model=model,number=number+1)
-                sub_body='<h1>'+escape(sub_title)+'</h1><p>'+tr.html('search_limits')+'</p>'+_offer_browser(search.model_chunk(data,model,number),tr)+search.pagination(model,len(data['offers']),slugs[model],tr)
+                sub_body='<h1>'+escape(sub_title)+'</h1><p>'+tr.html('search_limits')+'</p>'+_offer_browser(search.model_chunk(data,model,number),tr,separate_types=search.buyer_key(model) in {'seo_h100_intro','seo_a100_intro'})+search.pagination(model,len(data['offers']),slugs[model],tr)
                 pages[_page_file(lang.path(subroute))]=_page(sub_title,sub_body,data['last_updated'],built,origin=origin,route=subroute,tr=tr,description=tr.text('offer_pages_note'),noindex=True,
                     crumbs=[(tr.text('nav_home'),'/'),(model,route),(sub_title,subroute)])
         for key in tracked:
@@ -848,6 +873,10 @@ def build_site(store: PriceStore, out: str | Path = DEFAULT_OUT, *, today: str |
              "sitemap.xml": '<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(sitemap, encoding="unicode") + '\n',
              "robots.txt": 'User-agent: *\nAllow: /\n\nSitemap: ' + origin + '/sitemap.xml\n'+''.join('Sitemap: '+origin+'/sitemap-'+l.code+'.xml\n' for l in LANGUAGES)}
     other['_headers']=audience.embed_headers()
+    from .indexnow import KEY
+    other[KEY+'.txt']=KEY+'\n'
+    from .indexnow import page_manifest
+    other['indexnow-manifest.json']=json.dumps(page_manifest(pages,sitemap_entries,origin),sort_keys=True,indent=2)+'\n'
     other['data/latest.json']=json.dumps(index,ensure_ascii=False,indent=2,allow_nan=False)+'\n'
     for lang in LANGUAGES:
         other[lang.path('/feed.xml').lstrip('/')]=audience.feed(feed_items,slugs,origin,today,catalogs[lang.code])

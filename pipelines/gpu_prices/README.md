@@ -1,5 +1,42 @@
 # GPU price index — API and page-provider integration
 
+## b20 search intent, Dataset discovery and IndexNow
+
+RTX 4090 desktop pages compare per-GPU hourly rates with the minimum billable
+instance cost. H100 pages explicitly distinguish PCIe 80GB, SXM 80GB and NVL
+94GB; A100 pages distinguish 40/80GB and PCIe/SXM/unspecified interfaces. Exact
+model URLs remain separate. Their offer lists have separate on-demand and Spot
+blocks, including continuation pages. Interruptible and reserved offers retain
+their own separately labelled blocks as well. All eight catalogs supply the new copy.
+Cards show the instance hourly total and, when documented, its initial minimum
+billing duration/charge. Missing allocations, component-only CPU/RAM charges,
+tax, fees, stock, promotional floors and display-only tiers retain their labels.
+
+Each localized `/data/` has Dataset JSON-LD matching its visible name,
+description, compilation creator, licence scope, observed date interval and
+Tier A JSON download links. Temporal coverage uses retained export history and
+observation dates, never a build date or an invented starting date. CC BY 4.0
+applies only to our rights in the compilation, excluding upstream rights.
+
+Builds generate the public IndexNow ownership key file and
+`indexnow-manifest.json`. SHA-256 covers each sitemap HTML page, excluding only
+the explicit `/built` clock element. Price, source/observation time, qualifiers,
+styles and other page content affect the hash. Noindex continuations, embeds,
+JSON, assets and the key file are not submitted. Removal from the indexable set
+queues the old URL too. Independent auditing reconstructs every hash.
+
+After a successful deployment, CI runs `python -m ci.indexnow --manifest
+ci/runtime/site/indexnow-manifest.json --receipt ci/runtime/deploy-receipt.sqlite`
+before caching the receipt. SQLite tables retain deployed hashes, pending
+changed/deleted URLs and attempted URL counts per UTC day. One POST goes only to
+`https://api.indexnow.org/indexnow`; at most 10,000 URLs may be attempted in a
+day, including failed requests. Failures/overflow remain queued for a later
+successful deployment. No pending changes means no HTTP request. A missing
+baseline seeds hashes without a ping and conservatively closes that UTC day's
+unknown budget; it never triggers a full-site resubmission. Receipt replacement
+preserves these tables. CLI errors and HTTP failures do not fail the deploy job.
+IndexNow receipt/acceptance does not establish indexing or ranking.
+
 ## b18 embeds, public data and daily observations
 
 `/embed/<model-slug>.html` is a self-contained, script-free, noindex widget below

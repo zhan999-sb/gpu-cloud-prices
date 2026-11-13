@@ -85,12 +85,29 @@ def embed_section(slug, origin, tr):
 
 
 def data_index(exports, origin, day, built):
-    return {'schema_version': 1, 'observation_day': day, 'generated_at': built,
+    dates = sorted({stamp[:10] for data in exports.values()
+                    for stamp in ([data['last_updated']] + [o['collected_at'] for o in data['offers']]
+                                  + [p['day'] for series in data['history'].values() for p in series]) if stamp})
+    temporal = (dates[0]+'/'+dates[-1]) if dates else None
+    return {'schema_version': 1, 'observation_day': day, 'generated_at': built, 'temporal_coverage': temporal,
             'license': LICENSE, 'license_scope': 'compiled data only; provider rights reserved',
             'attribution': 'GPU Price Index', 'attribution_url': origin + '/data/',
             'exports': [{'gpu_model': data['gpu_model'], 'url': origin + '/' + filename,
                          'last_updated': data['last_updated'], 'generated_at': data['generated_at']}
                         for filename, data in sorted(exports.items())]}
+
+
+def dataset(index, tr, origin):
+    """Describe the compilation; upstream content is not relicensed."""
+    return {'@context':'https://schema.org', '@type':'Dataset',
+            '@id':origin+'/data/#dataset', 'url':origin+tr.language.path('/data/'),
+            'name':tr.text('growth_data_title'),
+            'description':tr.text('growth_data_intro')+' '+tr.text('growth_license'),
+            'license':LICENSE, 'inLanguage':tr.language.code,
+            'creator':{'@type':'Organization','name':'GPU Price Index','url':origin+'/'},
+            'temporalCoverage':index['temporal_coverage'],
+            'distribution':[{'@type':'DataDownload','encodingFormat':'application/json','contentUrl':item['url']}
+                            for item in index['exports']]}
 
 
 def data_body(index, tr):
@@ -105,6 +122,8 @@ def data_body(index, tr):
     for key in ('growth_data_intro', 'growth_cadence', 'growth_license', 'growth_attribution'):
         body += '<p>' + tr.html(key) + '</p>'
     body += '<p><a rel="license noopener" href="' + LICENSE + '">CC BY 4.0</a></p>'
+    body += '<p data-growth="creator">'+tr.html('seo_creator')+': <a href="'+escape(index['attribution_url'].removesuffix('data/'),quote=True)+'">GPU Price Index</a></p>'
+    body += '<p data-growth="temporal">'+tr.html('seo_temporal')+': '+escape(index['temporal_coverage'] or tr.text('not_observed'))+'</p>'
     body += '<p><a href="/data/latest.json">' + tr.html('growth_data_index') + '</a></p>'
     body += '<h2>' + tr.html('growth_fields_title') + '</h2>'
     for key, fields in groups:

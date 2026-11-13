@@ -6,6 +6,8 @@ are accepted as expected values.
 """
 from datetime import date, timedelta
 import math
+import hashlib
+import json
 import re
 import struct
 from urllib.parse import urljoin, urlsplit
@@ -23,6 +25,8 @@ def model_copy(model, data, tr):
     updated=max((r['collected_at'] for r in good),default=None)
     title=tr.text('search_title' if updated else 'search_empty_title',model=model,
                   date=(updated or data['last_updated'] or data['observation_day'])[:10])
+    if model=='RTX 4090 24GB':title=tr.text('seo_4090_title')
+    elif re.fullmatch(r'(H100|A100)(?: .*GB)?',model):title=tr.text('seo_h100_title' if model.startswith('H100') else 'seo_a100_title',model=model)
     spread=_distribution(good)
     intro=(tr.text('search_intro',minimum=_dollars(spread['min']),median=_dollars(spread['median']),
         offers=len(good),providers=len({o['provider'] for o in good}),
@@ -151,12 +155,18 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
                 expected_types.append('BreadcrumbList')
             else:
                 expected_types=({'home':['WebSite','BreadcrumbList'],'method':['WebPage','BreadcrumbList'],
-                                 '404':['WebPage','BreadcrumbList']}.get(kind,['BreadcrumbList']))
+                                 '404':['WebPage','BreadcrumbList'],
+                                 'data':['Dataset','BreadcrumbList'] if facts['exports'] else ['BreadcrumbList']}.get(kind,['BreadcrumbList']))
             if [d.get('@type') for d in page.structured]!=expected_types:
                 errors.append(filename+': unexpected JSON-LD types/count (A-only Dataset and visible FAQ required)')
             if kind=='model':
                 title,intro,trend=model_copy(subject,facts['models'][subject],tr)
                 expected_search={'intro':intro,'trend':trend}
+                buyer=('seo_4090_intro' if subject=='RTX 4090 24GB' else
+                       'seo_h100_intro' if re.fullmatch(r'H100(?: .*GB)?',subject) else
+                       'seo_a100_intro' if re.fullmatch(r'A100(?: .*GB)?',subject) else None)
+                if buyer:expected_search['buyer-intro']=tr.text(buyer)
+                if buyer in {'seo_h100_intro','seo_a100_intro'}:expected_search['variant']=tr.text('seo_variant',model=subject)
                 social=origin+'/social/'+slugs[subject]+'.png'
                 if page.metadata.get('og:image')!=social or page.metadata.get('twitter:image')!=social or page.metadata.get('twitter:card')!='summary_large_image':errors.append(filename+': social image mismatch')
             elif kind=='provider':
@@ -230,13 +240,15 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
                 if page.title!=tr.text('page_title',title=title,site_name=tr.text('site_name')):errors.append(filename+': auxiliary title mismatch')
                 for k,v in {'og:title':title,'twitter:title':title,'description':description,'og:description':description,'twitter:description':description}.items():
                     if page.metadata.get(k)!=v:errors.append(filename+': auxiliary '+k+' mismatch')
-                if any(d.get('@type') in {'Dataset','FAQPage'} for d in page.structured):errors.append(filename+': unexpected dataset/FAQ on auxiliary page')
-                _audit_cards(page,'auxiliary',tr,facts,filename,errors,entries_override=expected_cards)
+                if kind!='data' and any(d.get('@type') in {'Dataset','FAQPage'} for d in page.structured):errors.append(filename+': unexpected dataset/FAQ on auxiliary page')
+                _audit_cards(page,subject[0] if kind=='continuation' else 'auxiliary',tr,facts,filename,errors,entries_override=expected_cards)
                 permitted=allowed|{title}
                 if kind=='data':
                     permitted.add('CC BY 4.0')
                     permitted.update(origin+'/data/'+slugs[m]+'.json' for m in facts['exports'])
                     permitted.update('· '+d['last_updated'] for d in facts['exports'].values())
+                    dates=sorted({s[:10] for d in facts['exports'].values() for s in [d['last_updated']]+[r['collected_at'] for r in d['offers']]+[p['day'] for series in d['history'].values() for p in series] if s})
+                    permitted.add((dates[0]+'/'+dates[-1]) if dates else tr.text('not_observed'))
                 for m in facts['models']:
                     permitted.update(tr.text('offer_page',model=m,number=i+1) for i in range((len(facts['models'][m]['offers'])+11)//12))
                 for text in set(page.unmarked):
@@ -247,6 +259,9 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
                         v=_resolve(page_facts,p)
                         if fmt=='money':expected=_dollars(v)
                         elif fmt=='number':expected=format(v,'g')
+                        elif fmt.startswith('minimum-charge-'):
+                            amount=v['price_per_hour']*(v['gpu_count'] if v['price_scope']=='per_gpu' else 1)*v['minimum_billing_seconds']/3600
+                            expected=_dollars(amount) if fmt.endswith('money') else format(amount,'g')
                         elif fmt=='date':expected=v[:10]
                         elif fmt=='clock':expected=__import__('datetime').datetime.fromisoformat(v.replace('Z','+00:00')).strftime('%H:%M UTC')
                         elif fmt.startswith('instance-'):
@@ -291,6 +306,19 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
             path=target.path.lstrip('/')
             path=path+'index.html' if path.endswith('/') or not path else path if '.' in path.rsplit('/',1)[-1] else path+'.html'
             if not (out/path).is_file():errors.append(url+': broken internal link '+href)
+    key='d6ef1384259a4c708385f2af990ac9a1'
+    extra.update({key+'.txt','indexnow-manifest.json'})
+    try:
+        if (out/(key+'.txt')).read_bytes()!=(key+'\n').encode():errors.append('IndexNow public key file mismatch')
+        expected_hashes={}
+        for url,(_,route,code) in indexed.items():
+            lang=next(l for l in LANGUAGES if l.code==code)
+            raw=(out/_file(route,lang)).read_text(encoding='utf-8')
+            raw=re.sub(r'<time datetime="[^"]*" data-stat="/built" data-format="date">[^<]*</time>','<time data-stat="/built"></time>',raw)
+            expected_hashes[url]=hashlib.sha256(raw.encode('utf-8')).hexdigest()
+        _compare(json.loads((out/'indexnow-manifest.json').read_text(encoding='utf-8')),
+                 {'version':1,'origin':origin,'pages':expected_hashes},'IndexNow page hashes',errors)
+    except (OSError,ValueError):errors.append('IndexNow key/manifest missing or invalid')
     return extra,dict(extra_html_pages=extra_html,additional_values_checked=additional_values,indexed_pages=len(indexed),noindex_pages=len(parsed)-len(indexed),sitemap_urls=len(indexed),language_sitemaps=8)
 
 

@@ -24,7 +24,7 @@ from pipelines.gpu_prices.i18n import CATALOG_DIR, LANGUAGES, load_catalogs, pla
 from pipelines.gpu_prices.providers.azure import API_URL, AzureCollector, initial_url, normalize_item
 from pipelines.gpu_prices.schema import Offer, validate_offer
 from pipelines.gpu_prices.store import PriceStore
-from pipelines.gpu_prices.audit import AuditError, audit_site, live_sample
+from pipelines.gpu_prices.audit import AuditError, Page, audit_site, live_sample
 from pipelines.gpu_prices.links import link_for
 from pipelines.gpu_prices.regions import region_class
 
@@ -353,7 +353,10 @@ def test_site_from_fixtures_cheapest_html_json_and_history(tmp_path):
     slug = model_slug("H100 SXM 80GB")
     model_html = (tmp_path / slug / "index.html").read_text(encoding="utf-8")
     offers_html = model_html[model_html.index("Today&#x27;s observed offers"):]
-    assert offers_html.index("$1.00</span>") < offers_html.index("$3.00</span>")
+    assert offers_html.index('data-price-block="on_demand"') < offers_html.index('data-price-block="spot"')
+    parsed=Page(model_html)
+    assert [c['attrs']['data-price-type'] for c in parsed.cards]==['on_demand','spot']
+    assert '$3.00' in parsed.cards[0]['roles']['per-gpu'] and '$1.00' in parsed.cards[1]['roles']['per-gpu']
     assert "On-demand" in model_html and "Spot" in model_html
     assert "<svg" in model_html and "Exact daily history values" in model_html
     svg = model_html[model_html.index("<svg"):model_html.index("</svg>") + 6]
@@ -619,7 +622,7 @@ def test_seo_sharing_structured_data_and_sitemap(tmp_path):
     model = Metadata((tmp_path / "h100-sxm-80gb" / "index.html").read_text(encoding="utf-8"))
     assert index.json_ld[0]["@type"] == "WebSite" and index.json_ld[0]["url"] == origin + "/"
     assert model.canonicals == [origin + "/h100-sxm-80gb/"]
-    assert "H100 SXM 80GB cloud price per hour (updated 2026-11-12)" in model.titles[0]
+    assert "H100 Cloud Rental Prices — PCIe vs SXM, Spot vs On-Demand (H100 SXM 80GB)" in model.titles[0]
     assert "minimum $1.00, median $3.00. Eligible offers: 3; providers: 1" in model.meta["description"]
     for page in (index, model):
         assert page.meta["og:url"] == page.canonicals[0]
@@ -661,7 +664,7 @@ def test_thin_content_noindex_and_sitemap_boundary(tmp_path, count):
     content = (tmp_path / "h100-sxm-80gb" / "index.html").read_text(encoding="utf-8")
     page = Metadata(content)
     if count == 0:
-        assert "no current eligible offers" in page.titles[0]
+        assert load_catalogs()['en'].text('search_empty_intro') in page.meta['description']
         assert "temporalCoverage" not in page.json_ld[0]
         assert "Historical prices below are not current offers" in content
 
@@ -706,7 +709,7 @@ def test_complete_snapshot_excludes_earlier_same_day_keys_without_deleting_histo
     assert exported["history"]["on_demand"][0]["min"] == 3
     assert exported["history"]["on_demand"][0]["count"] == 2
     page = Metadata((tmp_path / "h100-sxm-80gb" / "index.html").read_text(encoding="utf-8"))
-    assert "H100 SXM 80GB cloud price per hour" in page.titles[0]
+    assert "H100 Cloud Rental Prices — PCIe vs SXM, Spot vs On-Demand (H100 SXM 80GB)" in page.titles[0]
     assert "minimum $1.00, median $3.00. Eligible offers: 3" in page.meta['description']
     assert "old-region" not in {place["name"] for place in page.json_ld[0]["spatialCoverage"]}
 
@@ -921,14 +924,14 @@ def test_every_language_page_reciprocal_metadata_links_sitemap_and_contact(tmp_p
         content = (tmp_path / lang.prefix / "a100-80gb/index.html").read_text(encoding="utf-8")
         assert '$1.23' in content and '$1,23' not in content
         page = Metadata(content)
-        assert "1.23" in page.meta['description'] and TODAY in page.titles[0]
+        assert "1.23" in page.meta['description'] and TODAY in content
         singular = {
             "en": "1 offer across 1 Azure region", "zh-Hans": "1 条报价、1 个 Azure 区域",
             "ja": "1 件、Azure 1 リージョン", "ko": "요금 1건, Azure 지역 1곳",
             "de": "1 Angebot in 1 Azure-Region", "fr": "1 offre dans 1 région Azure",
             "es": "1 oferta en 1 región de Azure", "pt-BR": "1 oferta em 1 região do Azure",
         }
-        assert page.meta['og:title'] == catalogs[lang.code].text('search_title',model='A100 80GB',date=TODAY)
+        assert page.meta['og:title'] == catalogs[lang.code].text('seo_a100_title',model='A100 80GB')
         homepage = Metadata((tmp_path / lang.prefix / "index.html").read_text(encoding="utf-8"))
         assert "5" in homepage.titles[0] and "5" in homepage.meta["description"]
         assert "3" in homepage.titles[0] and "3" in homepage.meta["description"]
@@ -1071,7 +1074,7 @@ def test_headlines_keep_demand_and_spot_separate_and_audit_raw_precision(tmp_pat
         assert audit_site(store.connection, tmp_path)["html_pages"] == 88
     text = (tmp_path / "h100-sxm-80gb/index.html").read_text(encoding="utf-8")
     page = Metadata(text)
-    assert "$2.27" in page.meta['description'] and "cloud price per hour" in page.titles[0]
+    assert "$2.27" in page.meta['description'] and "H100 Cloud Rental Prices" in page.titles[0]
     assert "median $7.28" in page.meta["description"] and "on-demand: 1; Spot: 1" in page.meta['description']
     assert "Edge zone" in text and "Restricted region" in text
     assert "FAQPage" in text and "theme-color" in text and "og:image" in text
@@ -1148,7 +1151,7 @@ def test_independent_audit_rejects_corrupt_published_numbers(tmp_path, damage):
             elif damage == "title":
                 text = text.replace("<title>H100", "<title>H200", 1)
             elif damage == "metadata":
-                text = text.replace('content="H100 SXM 80GB cloud price per hour', 'content="H200 SXM 80GB cloud price per hour', 1)
+                text = text.replace('content="H100 Cloud Rental Prices', 'content="H200 Cloud Rental Prices', 1)
             elif damage == "faq":
                 text = text.replace('data-faq="0">On-demand: $3.00', 'data-faq="0">On-demand: $0.30', 1)
             elif damage == "bar":
@@ -1157,6 +1160,7 @@ def test_independent_audit_rejects_corrupt_published_numbers(tmp_path, damage):
                 text = re.sub(r'<span data-stat="/models/H100 SXM 80GB/offers/0/price_per_hour".*?</span>', '', text, count=1)
             else:
                 text = text.replace('</main>', '<p>Only $0.01 per GPU hour</p></main>')
+            assert text != path.read_text(encoding='utf-8'), 'Corruption must change the artifact'
             path.write_text(text, encoding="utf-8")
         with pytest.raises(AuditError, match="Statistics audit FAILED"):
             audit_site(store.connection, tmp_path)

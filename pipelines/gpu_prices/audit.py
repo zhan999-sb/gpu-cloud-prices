@@ -231,6 +231,8 @@ class Page(HTMLParser):
         self.links, self.h1, self.search_values, self.breadcrumbs, self.outside_values = [], [], {}, [], []
         self.faq_questions=[]
         self.growth_nodes=[]
+        self.price_blocks=[]
+        self.price_block_headings=[]
         self.table_rows,self.current_row=[],None
         self.feed(text)
         self.close()
@@ -238,6 +240,7 @@ class Page(HTMLParser):
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
         if tag=='tr':self.current_row=[]
+        if 'data-price-block' in a:self.price_blocks.append([a['data-price-block'],[]])
         if tag in {'a','link','script'}:self.links.append((tag,a))
         if 'data-model-group' in a:self.groups.append((tag,a))
         if 'data-offer-category' in a:self.offer_groups.append((tag,a))
@@ -245,6 +248,8 @@ class Page(HTMLParser):
             group = next((f[1]['data-model-group'] for f in reversed(self.stack) if 'data-model-group' in f[1]), None)
             offer_group=next((f[1]['data-offer-category'] for f in reversed(self.stack) if 'data-offer-category' in f[1]),None)
             self.card = {'attrs':a, 'roles':{}, 'values':[], 'links':[], 'group':group, 'offer_group':offer_group}
+            block=next((f[1]['data-price-block'] for f in reversed(self.stack) if 'data-price-block' in f[1]),None)
+            if block is not None and self.price_blocks:self.price_blocks[-1][1].append(a['data-offer'])
         if self.card is not None and tag == 'a':
             self.card['links'].append(a)
         if tag == "meta":
@@ -279,8 +284,11 @@ class Page(HTMLParser):
             if self.current_row:self.table_rows.append(self.current_row)
             self.current_row=None
         if kind=='h1':self.h1.append(text)
+        if kind=='h3':
+            block=next((f[1]['data-price-block'] for f in reversed(self.stack) if 'data-price-block' in f[1]),None)
+            if block is not None and self.card is None:self.price_block_headings.append([block,text])
         if kind=='summary' and any(f[1].get('class')=='faq' for f in self.stack):self.faq_questions.append(text)
-        if ('data-search' in a or 'data-faq' in a or 'data-growth' in a) and any('hidden' in attrs or 'display:none' in attrs.get('style','').replace(' ','') for attrs in [a]+[f[1] for f in self.stack]):raise AuditError('Audited content must be visible')
+        if ('data-search' in a or 'data-faq' in a or 'data-growth' in a or 'data-price-block' in a or a.get('class')=='minimum-instance') and any('hidden' in attrs or 'display:none' in attrs.get('style','').replace(' ','') for attrs in [a]+[f[1] for f in self.stack]):raise AuditError('Audited content must be visible')
         if 'data-search' in a:
             key=a['data-search']
             if key in self.search_values:raise AuditError('Duplicate search content marker: '+key)
@@ -298,7 +306,7 @@ class Page(HTMLParser):
         if self.card is not None:
             if kind == 'h3':self.card['roles']['offer-model']=text
             if kind == 'a' and a.get('class')=='button':self.card['roles']['cta']=text
-            if a.get('class') in {'provider-pill','offer-region','offer-price','per-gpu','checked','price-unit','native-price','hardware','offer-badges','component-note','marketplace-note'}:
+            if a.get('class') in {'provider-pill','offer-region','offer-price','per-gpu','checked','price-unit','native-price','hardware','offer-badges','component-note','marketplace-note','minimum-instance'}:
                 self.card['roles'][a['class']] = text
             if kind == 'article' and 'data-offer' in a:
                 self.cards.append(self.card)
@@ -326,7 +334,10 @@ def _metadata(tr, model, data, facts):
         return tr.text("not_found"), tr.text("not_found_description")
     from .search_audit import model_copy
     title,intro,_=model_copy(model,data,tr)
-    return title,title+'. '+intro
+    buyer=('seo_4090_intro' if model=='RTX 4090 24GB' else
+           'seo_h100_intro' if re.fullmatch(r'H100(?: .*GB)?',model) else
+           'seo_a100_intro' if re.fullmatch(r'A100(?: .*GB)?',model) else None)
+    return title,(tr.text(buyer)+' ' if buyer else '')+title+'. '+intro
 
 
 def _faq_expected(tr, name, data, day):
@@ -468,7 +479,20 @@ def _audit_cards(page, name, tr, facts, filename, errors, entries_override=None)
                 small=key=='consumer' and (not capacity or float(capacity.group(1))<12)
                 return CATEGORIES.index(key),small
             local.sort(key=category_key)
+        if name and re.fullmatch(r'(H100|A100)(?: .*GB)?',name):
+            kinds=['on_demand','spot']+sorted({e[1]['price_type'] for e in local}-{'on_demand','spot'})
+            local.sort(key=lambda e: kinds.index(e[1]['price_type']))
         expected.extend((p,r,'fractional' if fraction else 'offers') for p,r in local)
+    if name and re.fullmatch(r'(H100|A100)(?: .*GB)?',name):
+        blocks=[]
+        for fraction in (False,True):
+            kinds=['on_demand','spot']+sorted({r['price_type'] for _,r,_ in expected if fractional(r)==fraction}-{'on_demand','spot'})
+            for kind in kinds:
+                pointers=[p for p,r,g in expected if fractional(r)==fraction and r['price_type']==kind]
+                if pointers:blocks.append([kind,pointers])
+        if page.price_blocks!=blocks:errors.append(filename+': Spot/on-demand block membership mismatch')
+        if page.price_block_headings!=[[kind,tr.text(kind)] for kind,_ in blocks]:errors.append(filename+': Spot/on-demand block heading mismatch')
+    elif page.price_blocks:errors.append(filename+': unexpected price blocks')
     for tag,attrs in page.offer_groups:
         if attrs['data-offer-category']=='legacy' and (tag!='details' or 'open' in attrs):
             errors.append(filename+': legacy offers must be collapsed details')
@@ -507,6 +531,16 @@ def _audit_cards(page, name, tr, facts, filename, errors, entries_override=None)
                         'per-gpu':(('' if row['currency']=='USD' else row['currency']+' ')+(_dollars(_rate(row)) if row['currency']=='USD' else format(_rate(row),'g'))+' '+tr.text('per_gpu_hour') if _rate(row) is not None else tr.text('unknown_gpu_rate')),
                         'checked':tr.text('checked_at',time=clock),
                         'price-unit':tr.text('scope_gpu_component' if row['price_scope']=='gpu_component' else 'instance_hour')}
+        minimum=tr.text('seo_minimum_instance')+': '
+        if row['price_scope']=='gpu_component' or (row['price_scope']=='per_gpu' and row['gpu_count'] is None):
+            minimum+=tr.text('seo_instance_unknown')
+        else:
+            minimum+=row['currency']+' '+amount+'/hr'
+            if row['minimum_billing_seconds'] is None:minimum+=' · '+tr.text('seo_billing_unknown')
+            else:
+                charge=instance*row['minimum_billing_seconds']/3600
+                minimum+=' · '+tr.text('seo_billing_floor')+': '+row['currency']+' '+(_dollars(charge) if row['currency']=='USD' else format(charge,'g'))+' / '+format(row['minimum_billing_seconds'],'g')+' '+tr.text('seo_seconds')
+        expected_roles['minimum-instance']=minimum
         if row['original_currency'] and row['original_currency']!=row['currency']:
             expected_roles['native-price']=tr.text('original_hourly')+': '+row['original_currency']+' '+format(row['original_price'],'g')+'/hr · '+tr.text('scope_'+row['price_scope'])
         for role,value in expected_roles.items():
@@ -693,6 +727,9 @@ def _audit(conn, out):
                     if fmt.startswith('instance-'):
                         amount=value['price_per_hour']*((value['gpu_count'] or 1) if value['price_scope']=='per_gpu' else 1)
                         expected=_dollars(amount) if fmt=='instance-money' else format(amount,'g')
+                    elif fmt.startswith('minimum-charge-'):
+                        amount=value['price_per_hour']*(value['gpu_count'] if value['price_scope']=='per_gpu' else 1)*value['minimum_billing_seconds']/3600
+                        expected=_dollars(amount) if fmt.endswith('money') else format(amount,'g')
                     elif fmt=='clock':
                         expected=datetime.fromisoformat(value.replace('Z','+00:00')).strftime('%H:%M UTC')
                     elif fmt=='vram':

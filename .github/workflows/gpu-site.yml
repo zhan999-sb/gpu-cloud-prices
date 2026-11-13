@@ -126,6 +126,11 @@ jobs:
         if: success() && steps.deploy.outcome == 'success'
         run: python -m ci.refresh_policy deployed --db data/gpu_prices.sqlite --receipt ci/runtime/deploy-receipt.sqlite --fingerprint '${{ steps.refresh.outputs.fingerprint }}' --snapshot-at '${{ steps.refresh.outputs.snapshot_at }}'
 
+      - name: Notify IndexNow of changed pages
+        if: success() && steps.deploy.outcome == 'success'
+        continue-on-error: true
+        run: python -m ci.indexnow --manifest ci/runtime/site/indexnow-manifest.json --receipt ci/runtime/deploy-receipt.sqlite | tee ci/reports/indexnow.json
+
       - name: Persist successful deployment receipt
         if: success() && steps.deploy.outcome == 'success'
         uses: actions/cache/save@v4.2.3

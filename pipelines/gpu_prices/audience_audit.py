@@ -82,6 +82,8 @@ def audit_audience(facts, manifest, out, errors, parsed_main):
     expected_index=dict(schema_version=1,observation_day=facts['date'],generated_at=facts['built'],
         license='https://creativecommons.org/licenses/by/4.0/',license_scope='compiled data only; provider rights reserved',
         attribution='GPU Price Index',attribution_url=origin+'/data/',exports=[])
+    dates=sorted({stamp[:10] for d in facts['exports'].values() for stamp in [d['last_updated']]+[r['collected_at'] for r in d['offers']]+[p['day'] for series in d['history'].values() for p in series] if stamp})
+    expected_index['temporal_coverage']=dates[0]+'/'+dates[-1] if dates else None
     for model in sorted(facts['exports'],key=lambda m:'data/'+slugs[m]+'.json'):
         data=facts['exports'][model]
         expected_index['exports'].append(dict(gpu_model=model,url=origin+'/data/'+slugs[model]+'.json',last_updated=data['last_updated'],generated_at=data['generated_at']))
@@ -125,8 +127,20 @@ def audit_audience(facts, manifest, out, errors, parsed_main):
             # Every public Offer field is documented, never a B/C schema preview.
             from .audit import FIELDS
             if any(field not in page.text for field in FIELDS):errors.append(datafile+': undocumented export field')
-            expected_rows=[('li',{'data-growth':'export'},r['url']+' · '+r['last_updated']) for r in expected_index['exports']]
+            temporal=expected_index['temporal_coverage']
+            expected_rows=[('p',{'data-growth':'creator'},tr.text('seo_creator')+': GPU Price Index'),
+                           ('p',{'data-growth':'temporal'},tr.text('seo_temporal')+': '+(temporal or tr.text('not_observed')))]
+            expected_rows += [('li',{'data-growth':'export'},r['url']+' · '+r['last_updated']) for r in expected_index['exports']]
             if [n for n in page.growth_nodes if 'data-growth' in n[1]]!=expected_rows:errors.append(datafile+': export observation timestamps mismatch')
+            expected_dataset={'@context':'https://schema.org','@type':'Dataset','@id':origin+'/data/#dataset',
+                'url':origin+lang.path('/data/'),'name':tr.text('growth_data_title'),
+                'description':tr.text('growth_data_intro')+' '+tr.text('growth_license'),
+                'license':expected_index['license'],'inLanguage':lang.code,
+                'creator':{'@type':'Organization','name':'GPU Price Index','url':origin+'/'},
+                'temporalCoverage':temporal,'distribution':[{'@type':'DataDownload','encodingFormat':'application/json','contentUrl':r['url']} for r in expected_index['exports']]}
+            datasets=[d for d in page.structured if d.get('@type')=='Dataset']
+            _compare(datasets,[expected_dataset] if expected_index['exports'] else [],datafile+'/Dataset',errors)
+            if not any(a.get('href')==origin+'/' for a in links):errors.append(datafile+': missing visible compilation creator link')
             if any('hidden' in a or 'style' in a for _,a in Tags(raw).tags):errors.append(datafile+': hidden data documentation')
         except (OSError,ValueError):errors.append(datafile+': invalid data page')
         homefile=lang.path('/').lstrip('/')+'index.html'

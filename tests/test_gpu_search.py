@@ -61,7 +61,7 @@ def test_search_copy_and_a_only_datasets_in_all_languages(search_site):
     for lang in LANGUAGES:
         tr=catalogs[lang.code]
         page=Page((folder/lang.prefix/'h100-sxm-80gb/index.html').read_text(encoding='utf-8'))
-        assert page.h1==[tr.text('search_title',model='H100 SXM 80GB',date=DAY)]
+        assert page.h1==[tr.text('seo_h100_title',model='H100 SXM 80GB')]
         assert page.search_values['intro']==tr.text('search_intro',minimum='$1.00',median='$4.50',offers=6,providers=2,demand=5,spot=1)
         # Nov 1 demand minimum 10 -> Nov 12 minimum 1. No Oct/future leakage.
         assert '-90.00%' in page.search_values['trend']

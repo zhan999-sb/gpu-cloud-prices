@@ -32,9 +32,21 @@ def summary(data):
 
 
 def title(model, data, tr):
+    if model == 'RTX 4090 24GB':
+        return tr.text('seo_4090_title')
+    if re.fullmatch(r'(H100|A100)(?: .*GB)?', model):
+        return tr.text('seo_h100_title' if model.startswith('H100') else 'seo_a100_title', model=model)
     s = summary(data)
     return tr.text('search_title' if s['updated'] else 'search_empty_title', model=model,
                    date=(s['updated'] or data['last_updated'] or data['observation_day'])[:10])
+
+
+def buyer_key(model):
+    if model == 'RTX 4090 24GB':
+        return 'seo_4090_intro'
+    if re.fullmatch(r'(H100|A100)(?: .*GB)?', model):
+        return 'seo_h100_intro' if model.startswith('H100') else 'seo_a100_intro'
+    return None
 
 
 def intro(data, tr):

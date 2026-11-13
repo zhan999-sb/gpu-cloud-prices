@@ -126,6 +126,14 @@ def record_deployed(store, receipt, digest, *, now=None, snapshot_at=None):
     os.close(handle)
     try:
         with closing(sqlite3.connect(temporary)) as conn:
+            # Keep the IndexNow page baseline, pending changes and UTC budget
+            # alongside the receipt across successful deployments/cache saves.
+            if path.is_file():
+                try:
+                    with closing(sqlite3.connect(path.resolve().as_uri()+'?mode=ro',uri=True)) as previous:
+                        previous.backup(conn)
+                except sqlite3.DatabaseError:
+                    pass  # A corrupt/evicted cache is a fresh receipt.
             _meta(conn)
             _put(conn, values)
         os.replace(temporary, path)
