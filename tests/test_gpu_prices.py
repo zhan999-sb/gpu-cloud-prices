@@ -537,7 +537,7 @@ def test_cli_all_network_failure_builds_honest_empty_site(tmp_path, monkeypatch,
         def collect(self, **kwargs):
             raise URLError("synthetic network outage")
     for name in ("AzureCollector", "LinodeCollector", "ScalewayCollector", "VerdaCollector", "PageCollector", "CloreCollector", "MonthlyCollector",
-                 "AwsCollector", "OracleCollector", "OvhCollector", "VultrCollector", "HetznerCollector"):
+                 "AwsCollector", "OracleCollector", "OvhCollector", "VultrCollector", "HetznerCollector", "GcpCollector"):
         monkeypatch.setattr(run, name, FailingCollector)
     monkeypatch.setattr(run, "refresh", lambda path: (None, "unavailable"))
     monkeypatch.setattr(run, "configure_logging", lambda: None)

@@ -1,0 +1,158 @@
+{
+  "skus": [
+    {
+      "name": "services/6F81-5844-456A/skus/88B8-C3ED-03F0",
+      "skuId": "88B8-C3ED-03F0",
+      "description": "Nvidia Tesla T4 GPU running in Americas",
+      "category": {
+        "serviceDisplayName": "Compute Engine",
+        "resourceFamily": "Compute",
+        "resourceGroup": "GPU",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-central1",
+        "us-east1"
+      ],
+      "pricingInfo": [
+        {
+          "effectiveTime": "2026-11-12T00:00:00Z",
+          "pricingExpression": {
+            "usageUnit": "h",
+            "usageUnitDescription": "hour",
+            "baseUnit": "s",
+            "baseUnitConversionFactor": 3600,
+            "displayQuantity": 1,
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 350000000
+                }
+              }
+            ]
+          },
+          "currencyConversionRate": 1
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/6F81-5844-456A/skus/1A25-07A3-AB6D",
+      "skuId": "1A25-07A3-AB6D",
+      "description": "Nvidia Tesla T4 GPU attached to Spot Preemptible VMs running in Americas",
+      "category": {
+        "serviceDisplayName": "Compute Engine",
+        "resourceFamily": "Compute",
+        "resourceGroup": "GPU",
+        "usageType": "Preemptible"
+      },
+      "serviceRegions": [
+        "us-central1"
+      ],
+      "pricingInfo": [
+        {
+          "effectiveTime": "2026-11-12T00:00:00Z",
+          "pricingExpression": {
+            "usageUnit": "h",
+            "usageUnitDescription": "hour",
+            "baseUnit": "s",
+            "baseUnitConversionFactor": 3600,
+            "displayQuantity": 1,
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 110000001
+                }
+              }
+            ]
+          },
+          "currencyConversionRate": 1
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/6F81-5844-456A/skus/DD90-547C-2AAA",
+      "skuId": "DD90-547C-2AAA",
+      "description": "Nvidia Tesla A100 80GB GPU attached to Spot Preemptible VMs running in Americas",
+      "category": {
+        "serviceDisplayName": "Compute Engine",
+        "resourceFamily": "Compute",
+        "resourceGroup": "GPU",
+        "usageType": "Preemptible"
+      },
+      "serviceRegions": [
+        "us-central1"
+      ],
+      "pricingInfo": [
+        {
+          "effectiveTime": "2026-11-12T00:00:00Z",
+          "pricingExpression": {
+            "usageUnit": "h",
+            "usageUnitDescription": "hour",
+            "baseUnit": "s",
+            "baseUnitConversionFactor": 3600,
+            "displayQuantity": 1,
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "1",
+                  "nanos": 250000000
+                }
+              }
+            ]
+          },
+          "currencyConversionRate": 1
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/6F81-5844-456A/skus/3178-715E-CFB6",
+      "skuId": "3178-715E-CFB6",
+      "description": "Spot Preemptible A2 Instance Core running in Americas",
+      "category": {
+        "serviceDisplayName": "Compute Engine",
+        "resourceFamily": "Compute",
+        "resourceGroup": "CPU",
+        "usageType": "Preemptible"
+      },
+      "serviceRegions": [
+        "us-central1"
+      ],
+      "pricingInfo": [
+        {
+          "effectiveTime": "2026-11-12T00:00:00Z",
+          "pricingExpression": {
+            "usageUnit": "h",
+            "usageUnitDescription": "hour",
+            "baseUnit": "s",
+            "baseUnitConversionFactor": 3600,
+            "displayQuantity": 1,
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 10000000
+                }
+              }
+            ]
+          },
+          "currencyConversionRate": 1
+        }
+      ],
+      "serviceProviderName": "Google"
+    }
+  ],
+  "nextPageToken": "fixture-page-2"
+}

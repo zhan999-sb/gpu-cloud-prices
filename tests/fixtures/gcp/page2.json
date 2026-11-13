@@ -1,0 +1,464 @@
+{
+  "skus": [
+    {
+      "name": "services/6F81-5844-456A/skus/FA01-0000-0001",
+      "skuId": "FA01-0000-0001",
+      "description": "Nvidia H100 80GB GPU running in Americas",
+      "category": {
+        "serviceDisplayName": "Compute Engine",
+        "resourceFamily": "Compute",
+        "resourceGroup": "GPU",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-central1"
+      ],
+      "pricingInfo": [
+        {
+          "effectiveTime": "2026-10-01T00:00:00Z",
+          "pricingExpression": {
+            "usageUnit": "h",
+            "usageUnitDescription": "hour",
+            "baseUnit": "s",
+            "baseUnitConversionFactor": 3600,
+            "displayQuantity": 1,
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "10",
+                  "nanos": 0
+                }
+              }
+            ]
+          },
+          "currencyConversionRate": 1
+        },
+        {
+          "effectiveTime": "2026-11-12T00:00:00Z",
+          "pricingExpression": {
+            "usageUnit": "h",
+            "usageUnitDescription": "hour",
+            "baseUnit": "s",
+            "baseUnitConversionFactor": 3600,
+            "displayQuantity": 1,
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "9",
+                  "nanos": 800000000
+                }
+              }
+            ]
+          },
+          "currencyConversionRate": 1
+        },
+        {
+          "effectiveTime": "2026-11-14T00:00:00Z",
+          "pricingExpression": {
+            "usageUnit": "h",
+            "usageUnitDescription": "hour",
+            "baseUnit": "s",
+            "baseUnitConversionFactor": 3600,
+            "displayQuantity": 1,
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "11",
+                  "nanos": 0
+                }
+              }
+            ]
+          },
+          "currencyConversionRate": 1
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/6F81-5844-456A/skus/7A6D-F74C-B0A3",
+      "skuId": "7A6D-F74C-B0A3",
+      "description": "Nvidia H100 80GB GPU attached to Spot Preemptible VMs running in Americas",
+      "category": {
+        "serviceDisplayName": "Compute Engine",
+        "resourceFamily": "Compute",
+        "resourceGroup": "GPU",
+        "usageType": "Preemptible"
+      },
+      "serviceRegions": [
+        "us-central1"
+      ],
+      "pricingInfo": [
+        {
+          "effectiveTime": "2026-11-12T00:00:00Z",
+          "pricingExpression": {
+            "usageUnit": "h",
+            "usageUnitDescription": "hour",
+            "baseUnit": "s",
+            "baseUnitConversionFactor": 3600,
+            "displayQuantity": 1,
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "3",
+                  "nanos": 200000000
+                }
+              }
+            ]
+          },
+          "currencyConversionRate": 1
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/6F81-5844-456A/skus/EDE5-960E-2433",
+      "skuId": "EDE5-960E-2433",
+      "description": "Nvidia L4 GPU running in Taiwan",
+      "category": {
+        "serviceDisplayName": "Compute Engine",
+        "resourceFamily": "Compute",
+        "resourceGroup": "GPU",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "asia-east1"
+      ],
+      "pricingInfo": [
+        {
+          "effectiveTime": "2026-11-12T00:00:00Z",
+          "pricingExpression": {
+            "usageUnit": "h",
+            "usageUnitDescription": "hour",
+            "baseUnit": "s",
+            "baseUnitConversionFactor": 3600,
+            "displayQuantity": 1,
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 560000000
+                }
+              }
+            ]
+          },
+          "currencyConversionRate": 1
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/6F81-5844-456A/skus/FA01-0000-0002",
+      "skuId": "FA01-0000-0002",
+      "description": "Nvidia Tesla A100 GPU running in Americas",
+      "category": {
+        "serviceDisplayName": "Compute Engine",
+        "resourceFamily": "Compute",
+        "resourceGroup": "GPU",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-central1"
+      ],
+      "pricingInfo": [
+        {
+          "effectiveTime": "2026-11-12T00:00:00Z",
+          "pricingExpression": {
+            "usageUnit": "h",
+            "usageUnitDescription": "hour",
+            "baseUnit": "s",
+            "baseUnitConversionFactor": 3600,
+            "displayQuantity": 1,
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "3",
+                  "nanos": 673000000
+                }
+              }
+            ]
+          },
+          "currencyConversionRate": 1
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/6F81-5844-456A/skus/FA01-0000-0003",
+      "skuId": "FA01-0000-0003",
+      "description": "Nvidia Tesla A100 80GB GPU running in Americas",
+      "category": {
+        "serviceDisplayName": "Compute Engine",
+        "resourceFamily": "Compute",
+        "resourceGroup": "GPU",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-central1"
+      ],
+      "pricingInfo": [
+        {
+          "effectiveTime": "2026-11-12T00:00:00Z",
+          "pricingExpression": {
+            "usageUnit": "h",
+            "usageUnitDescription": "hour",
+            "baseUnit": "s",
+            "baseUnitConversionFactor": 3600,
+            "displayQuantity": 1,
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "5",
+                  "nanos": 0
+                }
+              }
+            ]
+          },
+          "currencyConversionRate": 1
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/6F81-5844-456A/skus/8609-4BAD-F240",
+      "skuId": "8609-4BAD-F240",
+      "description": "Nvidia H100 80GB Plus GPU attached to Spot Preemptible VMs running in Americas",
+      "category": {
+        "serviceDisplayName": "Compute Engine",
+        "resourceFamily": "Compute",
+        "resourceGroup": "GPU",
+        "usageType": "Preemptible"
+      },
+      "serviceRegions": [
+        "us-central1"
+      ],
+      "pricingInfo": [
+        {
+          "effectiveTime": "2026-11-12T00:00:00Z",
+          "pricingExpression": {
+            "usageUnit": "h",
+            "usageUnitDescription": "hour",
+            "baseUnit": "s",
+            "baseUnitConversionFactor": 3600,
+            "displayQuantity": 1,
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "3",
+                  "nanos": 700000000
+                }
+              }
+            ]
+          },
+          "currencyConversionRate": 1
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/6F81-5844-456A/skus/EEE5-1DA5-D9CF",
+      "skuId": "EEE5-1DA5-D9CF",
+      "description": "Spot Preemptible A3 Instance Core running in Americas",
+      "category": {
+        "serviceDisplayName": "Compute Engine",
+        "resourceFamily": "Compute",
+        "resourceGroup": "CPU",
+        "usageType": "Preemptible"
+      },
+      "serviceRegions": [
+        "us-central1"
+      ],
+      "pricingInfo": [
+        {
+          "effectiveTime": "2026-11-12T00:00:00Z",
+          "pricingExpression": {
+            "usageUnit": "h",
+            "usageUnitDescription": "hour",
+            "baseUnit": "s",
+            "baseUnitConversionFactor": 3600,
+            "displayQuantity": 1,
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 10000000
+                }
+              }
+            ]
+          },
+          "currencyConversionRate": 1
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/6F81-5844-456A/skus/F619-87C3-D3BA",
+      "skuId": "F619-87C3-D3BA",
+      "description": "Spot Preemptible A3 Instance Ram running in Americas",
+      "category": {
+        "serviceDisplayName": "Compute Engine",
+        "resourceFamily": "Compute",
+        "resourceGroup": "RAM",
+        "usageType": "Preemptible"
+      },
+      "serviceRegions": [
+        "us-central1"
+      ],
+      "pricingInfo": [
+        {
+          "effectiveTime": "2026-11-12T00:00:00Z",
+          "pricingExpression": {
+            "usageUnit": "GiBy.h",
+            "usageUnitDescription": "hour",
+            "baseUnit": "By.s",
+            "baseUnitConversionFactor": 3865470566400,
+            "displayQuantity": 1,
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 1000000
+                }
+              }
+            ]
+          },
+          "currencyConversionRate": 1
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/6F81-5844-456A/skus/60FF-EC3A-2E13",
+      "skuId": "60FF-EC3A-2E13",
+      "description": "G2 Instance Core running in Taiwan",
+      "category": {
+        "serviceDisplayName": "Compute Engine",
+        "resourceFamily": "Compute",
+        "resourceGroup": "CPU",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "asia-east1"
+      ],
+      "pricingInfo": [
+        {
+          "effectiveTime": "2026-11-12T00:00:00Z",
+          "pricingExpression": {
+            "usageUnit": "h",
+            "usageUnitDescription": "hour",
+            "baseUnit": "s",
+            "baseUnitConversionFactor": 3600,
+            "displayQuantity": 1,
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 20000000
+                }
+              }
+            ]
+          },
+          "currencyConversionRate": 1
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/6F81-5844-456A/skus/3F9F-441A-EA47",
+      "skuId": "3F9F-441A-EA47",
+      "description": "G2 Instance Ram running in Taiwan",
+      "category": {
+        "serviceDisplayName": "Compute Engine",
+        "resourceFamily": "Compute",
+        "resourceGroup": "RAM",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "asia-east1"
+      ],
+      "pricingInfo": [
+        {
+          "effectiveTime": "2026-11-12T00:00:00Z",
+          "pricingExpression": {
+            "usageUnit": "GiBy.h",
+            "usageUnitDescription": "hour",
+            "baseUnit": "By.s",
+            "baseUnitConversionFactor": 3865470566400,
+            "displayQuantity": 1,
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 3000000
+                }
+              }
+            ]
+          },
+          "currencyConversionRate": 1
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/6F81-5844-456A/skus/FA01-0000-0004",
+      "skuId": "FA01-0000-0004",
+      "description": "Commitment v1: Nvidia Tesla T4 GPU running in Americas for 1 Year",
+      "category": {
+        "serviceDisplayName": "Compute Engine",
+        "resourceFamily": "Compute",
+        "resourceGroup": "GPU",
+        "usageType": "Commit1Yr"
+      },
+      "serviceRegions": [
+        "us-central1"
+      ],
+      "pricingInfo": [
+        {
+          "effectiveTime": "2026-11-12T00:00:00Z",
+          "pricingExpression": {
+            "usageUnit": "h",
+            "usageUnitDescription": "hour",
+            "baseUnit": "s",
+            "baseUnitConversionFactor": 3600,
+            "displayQuantity": 1,
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 200000000
+                }
+              }
+            ]
+          },
+          "currencyConversionRate": 1
+        }
+      ],
+      "serviceProviderName": "Google"
+    }
+  ]
+}

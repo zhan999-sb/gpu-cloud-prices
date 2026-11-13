@@ -9,7 +9,7 @@ PROVIDERS = {
     "koyeb": {"name":"Koyeb","tier":"D","enabled":False,"link_only":True,"note":"note_koyeb","source":"https://www.koyeb.com/docs/reference/instances"},
 
     "aws": {"name": "AWS EC2", "tier": "A", "enabled": True, "note": "note_aws", "source": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/region_index.json"},
-    "gcp": {"name": "Google Cloud", "tier": "A", "enabled": False, "note": "note_gcp", "source": "https://cloud.google.com/compute/gpus-pricing"},
+    "gcp": {"name": "Google Cloud", "tier": "A", "enabled": True, "note": "note_gcp", "source": "https://cloud.google.com/products/compute/gpus-pricing"},
     "hetzner": {"name": "Hetzner", "tier": "B", "enabled": True, "note": "note_hetzner", "source": "https://www.hetzner.com/dedicated-rootserver/matrix-gpu/"},
     "alibaba_intl": {"name": "Alibaba Cloud International", "tier": "D", "enabled": False, "link_only": True, "note": "note_alibaba_intl", "source": "https://www.alibabacloud.com/en/product/ecs/pricing"},
     "tencent_intl": {"name": "Tencent Cloud International", "tier": "D", "enabled": False, "link_only": True, "note": "note_tencent_intl", "source": "https://www.tencentcloud.com/pricing/cvm"},

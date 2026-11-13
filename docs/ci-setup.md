@@ -27,7 +27,7 @@
    Git remote URL、命令参数、聊天、`.env` 或仓库。这个 PAT **不需要**成为
    Actions secret；云端保存历史用 GitHub 自动提供的 `GITHUB_TOKEN`。
 3. 在仓库 **Settings → Secrets and variables → Actions → New repository
-   secret** 添加且仅需添加以下两项：
+   secret** 添加以下两项必需配置；GCP 采集的可选配置见文末：
 
    | Secret 名称 | 内容 |
    | --- | --- |
@@ -249,3 +249,35 @@ CI 未跳过或放宽这些测试；需由负责源码/测试的 agent 同步修
 专用于历史，不与外部写入者并发使用；DB 尚适合 Git 持久化。源码更新若改变
 这些契约，需同步调整 CI 门槛。首次建分支依赖采集已执行并产生有效 SQLite；
 测试失败不会创建空数据库来掩盖问题。
+
+## Google Cloud GPU 目录采集（b22）
+
+GCP 采集使用官方 [Cloud Billing Catalog API](https://docs.cloud.google.com/billing/v1/how-tos/catalog-api)，
+Compute Engine service ID 为 `6F81-5844-456A`。由操作员在自己的 Google Cloud
+项目启用 Cloud Billing API，创建并限制 API key，然后在 GitHub 仓库的
+**Settings → Secrets and variables → Actions** 添加可选 secret
+`GCP_BILLING_API_KEY`。工作流仅在 collect 步骤把该 secret 映射到同名环境变量。
+不要把密钥放入仓库、`.env`、CLI 参数、日志、fixture 或 URL 示例。
+
+未提供该环境变量（含空值）时，GCP 明确报告 skipped，不发请求、不消耗 DB meta
+限频预算，也不改写上次采集记录。设置后，每个数据库每六小时最多尝试一轮目录采集；
+预算在请求前提交，HTTP 400/403、网络错误及解析失败也会消耗本轮预算。
+400/403 按现有提供商部分失败策略报告 failed，不被伪装成 skipped。
+请求错误只保留固定说明及 HTTP 状态，不输出响应体、密钥或带密钥的 URL。
+
+采集按 `nextPageToken` 翻页，每页 5000 个 SKU，选取 GPU 分类、USD、小时单位和
+最新已生效的单一零起点费率，金额为 `units + nanos / 10^9`。按 `serviceRegions`
+展开区域，保留按需与 Spot/Preemptible 区别。A3/H100、A2/A100、G2/L4 仅采集
+目录明确给出的 GPU 组件价，标记 `gpu_component` 并显示“仅 GPU；CPU/RAM 另计”；
+不从 Core/RAM SKU 猜测整机配置。组件价不参与整机最低价比较，容量未知；税基保留
+`unknown`。八种语言均有组件提示和 GCP 方法说明。
+
+本地真实验证须由操作员通过安全方式向**当前进程环境**提供密钥，然后在项目根目录运行：
+
+```powershell
+python -m pipelines.gpu_prices.run collect --provider gcp --db pipelines/gpu_prices/runtime/b22/operator-copy.sqlite
+```
+
+`operator-copy.sqlite` 应为隔离验证库（可由现有价格库复制）；若该副本最近六小时已有
+GCP 尝试记录，会诚实跳过，需等待预算到期。新库则可立即采集。该命令只采集，不构建、
+推送或部署。本次实现仅用离线响应验证，没有密钥，也没有执行真实 GCP 价格采集。

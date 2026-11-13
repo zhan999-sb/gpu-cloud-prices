@@ -620,6 +620,17 @@ def _audit(conn, out):
                 errors.append(key + ': OVH initial one-minute billing minimum missing')
             if provider == 'oracle' and row['source_billing_unit'] != 'GPU-hour':
                 errors.append(key + ': GPU billing unit provenance missing')
+        if provider == 'gcp':
+            if (row['tier'] != 'A' or not row['export_allowed']
+                    or row['price_scope'] != 'gpu_component' or native != 'USD'
+                    or row['gpu_count'] is not None or row['gpu_fraction'] is not None
+                    or row['vcpu'] is not None or row['ram_gb'] is not None
+                    or row['billing_unit'] != 'GPU-hour' or row['source_billing_unit'] != 'GPU-hour'
+                    or row['tax_basis'] != 'unknown' or row['availability'] != 'unknown'
+                    or row['price_type'] not in {'on_demand', 'spot'}
+                    or row['source_url'] != 'https://cloudbilling.googleapis.com/v1/services/6F81-5844-456A/skus?currencyCode=USD&pageSize=5000'
+                    or row['price_conditions'] != 'GPU only; VM vCPU/RAM billed separately'):
+                errors.append(key + ': GCP GPU component provenance mismatch')
         if row['tier'] not in {'A','B','C'} or row['export_allowed'] and row['tier'] != 'A':
             errors.append(key + ': tier/export policy violation')
         if row['billing_unit'] not in {'instance-hour','instance-minute','instance-second','GPU-hour','gpu-hour','GPU-second'}:

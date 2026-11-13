@@ -340,7 +340,7 @@
   "note_ovh": "Catalogue officiel de la filiale FR en EUR hors TVA. Prix horaires des instances Linux ; régions et stock non précisés. Aucun prix local ou trois zones déduit.",
   "note_vultr": "Catalogue horaire officiel avec nombre explicite de GPU. Une liste de lieux vide ne garantit aucun stock. Tarifs préemptibles séparés ; GPU virtuels non vérifiés exclus.",
   "note_hetzner": "Serveurs GPU dédiés publics, facturés à l’heure avec plafond mensuel et frais uniques d’installation en supplément. Prix de départ signalés ; affichage uniquement.",
-  "note_gcp": "L’API officielle Cloud Billing Catalog exige une clé API d’un projet Google Cloud. Collecte désactivée avant cette configuration manuelle.",
+  "note_gcp": "Prix des composants GPU par heure du Cloud Billing Catalog officiel, y compris les SKU GPU A3/A2/G2. Les vCPU et la RAM de la VM sont factur?s s?par?ment. Sans GCP_BILLING_API_KEY, la collecte est ignor?e ; une collecte du catalogue au maximum toutes les six heures. Capacit? inconnue.",
   "note_alibaba_intl": "Lien uniquement : les conditions du site international interdisent l’extraction systématique pour créer une base et l’exploration automatisée. Aucune collecte ni export.",
   "note_tencent_intl": "Lien uniquement : les conditions internationales limitent les comparatifs et les usages concurrents. Tarifs anonymes non vérifiés ; API de devis signée. Aucune collecte ni export.",
   "seo_4090_title": "Prix horaire du RTX 4090 dans le cloud — Comparer GPU et instances",

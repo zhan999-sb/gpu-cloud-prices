@@ -19,6 +19,8 @@ from .providers.verda import VerdaCollector
 from .providers.hyperscalers import AwsCollector, OracleCollector, OvhCollector, VultrCollector, HetznerCollector
 from .providers.page_collector import PageCollector, PARSERS
 from .providers.clore_collector import CloreCollector
+from .providers.gcp import GcpCollector
+from .http import GcpRequestError
 from .fx import refresh, to_usd
 from .schema import parse_utc, utc_now
 from .store import DEFAULT_DB, PriceStore, ROOT
@@ -62,7 +64,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     parser.add_argument("--limit-pages", type=positive_int, default=None, help="Limit successful pages; coverage may be partial")
     extra = {'aws': AwsCollector, 'oracle': OracleCollector, 'ovh': OvhCollector,
-             'vultr': VultrCollector, 'hetzner': HetznerCollector}
+             'vultr': VultrCollector, 'hetzner': HetznerCollector, 'gcp': GcpCollector}
     names = ("azure", "linode", "scaleway", "verda", "clore", 'cloudclusters', *extra, *PARSERS)
     parser.add_argument("--provider", action="append", choices=names, help="Collect selected enabled providers; default collects all; pages at most hourly")
     parser.add_argument("--site-base-url", help="Public HTTPS origin; overrides SITE_BASE_URL (default: placeholder https://example.pages.dev)")
@@ -125,7 +127,7 @@ def main(argv: list[str] | None = None) -> int:
                             # have their own truthful, additive report section.
                             target = catalog_skips if name in extra else collections
                             target[name] = {"status": "skipped", "pages": 0, "records": 0,
-                                "reason": (f"source attempted within {collector.interval_hours} hours" if name in extra else "page fetched within 60 minutes"), "models": [],
+                                "reason": (getattr(collector, 'skip_reason', None) or (f"source attempted within {collector.interval_hours} hours" if name in extra else "page fetched within 60 minutes")), "models": [],
                                 "checked_at": started, "previous_run": store.provider_runs().get(name)}
                             continue
                         offers = [to_usd(o, rates) for o in offers]
@@ -144,7 +146,7 @@ def main(argv: list[str] | None = None) -> int:
                                 'bulk_streams': getattr(collector.client, 'stream_metrics', [])} if name in extra else {}),
                             "runtime_seconds": round(perf_counter() - timer, 3)}
                     except (OSError, ValueError, KeyError, TypeError, HTTPException) as exc:
-                        if isinstance(exc, CloreRequestError):
+                        if isinstance(exc, (CloreRequestError, GcpRequestError)):
                             LOG.error('%s collection failed: %s', name, exc)
                         else:
                             LOG.exception("%s collection failed; no partial batch saved", name)

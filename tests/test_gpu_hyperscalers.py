@@ -315,8 +315,8 @@ def test_new_providers_eight_languages_audited_and_b_display_only(tmp_path):
         with pytest.raises(ValueError):audit_site(store.connection,out)
 
 
-def test_blocked_and_credentialed_providers_are_visible_without_collectors():
-    assert PROVIDERS['gcp']['tier']=='A' and not PROVIDERS['gcp']['enabled']
+def test_blocked_providers_and_runtime_optional_gcp_are_visible():
+    assert PROVIDERS['gcp']['tier']=='A' and PROVIDERS['gcp']['enabled']
     for name in ['alibaba_intl','tencent_intl']:
         assert PROVIDERS[name]['tier']=='D' and not PROVIDERS[name]['enabled']
         with pytest.raises(ValueError):http.validate_url(PROVIDERS[name]['source'])

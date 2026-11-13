@@ -340,7 +340,7 @@
   "note_ovh": "Official FR subsidiary catalog in EUR, excluding VAT. Linux hourly instance prices; exact regions and capacity are unspecified. Local-zone and three-zone prices are not inferred.",
   "note_vultr": "Official hourly catalog with explicit GPU counts. Missing locations do not imply available capacity. Preemptible rates are labelled separately; unverified virtual GPU allocations are excluded.",
   "note_hetzner": "Public dedicated GPU servers, billed hourly with a monthly cap and an additional one-time setup fee. Configuration starting prices remain marked; display only.",
-  "note_gcp": "The official Cloud Billing Catalog API requires an API key from a Google Cloud project. Collection is disabled until this human setup step is completed.",
+  "note_gcp": "Official Cloud Billing Catalog GPU-hour components, including A3/A2/G2 GPU SKUs. GPU only; VM vCPU/RAM billed separately. Collection skips when GCP_BILLING_API_KEY is absent; catalog attempts are limited to once per six hours. Capacity is unknown.",
   "note_alibaba_intl": "Link only: international website terms prohibit systematic retrieval to build a database and crawling. No pricing collection or export.",
   "note_tencent_intl": "Link only: international terms restrict benchmarking and use competitive with the services. Anonymous pricing was not verified; the quote API needs a signature. No collection or export.",
   "seo_4090_title": "RTX 4090 Cloud Price per Hour — Compare GPU and Instance Costs",

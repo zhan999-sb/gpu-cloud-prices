@@ -20,6 +20,7 @@ from .providers.registry import PROVIDERS
 
 PROVIDER_LINKS = {
     "aws": {"name": "AWS EC2", "url": "https://aws.amazon.com/ec2/pricing/on-demand/", "ref_param": None},
+    "gcp": {"name": "Google Cloud", "url": "https://cloud.google.com/products/compute/gpus-pricing", "ref_param": None},
     "oracle": {"name": "Oracle Cloud", "url": "https://www.oracle.com/cloud/price-list/", "ref_param": None},
     "ovh": {"name": "OVHcloud", "url": "https://www.ovhcloud.com/en/public-cloud/prices/", "ref_param": None},
     "vultr": {"name": "Vultr", "url": "https://www.vultr.com/products/cloud-gpu/", "ref_param": None},

@@ -82,6 +82,7 @@ jobs:
         timeout-minutes: 20
         env:
           CLORE_API_KEY: ${{ secrets.CLORE_API_KEY }}
+          GCP_BILLING_API_KEY: ${{ secrets.GCP_BILLING_API_KEY }}
         run: |
           set +e
           python -m pipelines.gpu_prices.run collect --db data/gpu_prices.sqlite >ci/reports/collect.json 2>ci/reports/collect.log

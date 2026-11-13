@@ -34,6 +34,7 @@ ENDPOINTS = {
     "api.linode.com": {"/v4/linode/types", "/v4/regions", "/v4/regions/availability"},
     "api.scaleway.com": {"/product-catalog/v2alpha1/public-catalog/products"},
     "api.verda.com": {"/v1/instance-types"},
+    "cloudbilling.googleapis.com": {"/v1/services/6F81-5844-456A/skus"},
     "api.vultr.com": {"/v2/plans"},
     "apexapps.oracle.com": {"/pls/apex/cetools/api/v1/products/"},
     "eu.api.ovh.com": {"/1.0/order/catalog/public/cloud"},
@@ -44,10 +45,21 @@ ENDPOINTS['pricing.us-east-1.amazonaws.com'] = {'/offers/v1.0/aws/AmazonEC2/curr
 ENDPOINTS['website.spot.ec2.aws.a2z.com'] = {'/spot.json'}
 ENDPOINTS['www.hetzner.com'] = {'/dedicated-rootserver/matrix-gpu/'}
 BOUNDED_HOSTS = frozenset({'pricing.us-east-1.amazonaws.com', 'website.spot.ec2.aws.a2z.com',
-                         'api.vultr.com', 'apexapps.oracle.com', 'eu.api.ovh.com', 'www.hetzner.com'})
+                         'api.vultr.com', 'apexapps.oracle.com', 'eu.api.ovh.com', 'www.hetzner.com',
+                         'cloudbilling.googleapis.com'})
 ALLOWED_HOSTS = frozenset(ENDPOINTS)
 TIMEOUT = 60
 ATTEMPTS = 5
+
+
+class GcpRequestError(OSError):
+    """Fixed messages only: request URLs, response bodies and keys stay private."""
+
+    def __init__(self, status=0):
+        self.status = status
+        message = (f"Google Cloud Billing Catalog request failed (HTTP {status})"
+                   if status else "Google Cloud Billing Catalog transport or response failed")
+        super().__init__(message)
 
 
 def validate_url(url: str) -> str:
@@ -102,6 +114,7 @@ class HttpClient:
         validate_url(url)  # Validation errors never retry or send a request.
         parts = urlsplit(url)
         is_clore = parts.hostname == 'api.clore.ai'
+        is_gcp = parts.hostname == 'cloudbilling.googleapis.com'
         credentials = auth_headers(url) if is_clore else {}
         # Page requests have a DB-backed hourly budget. A transient failure also
         # consumes it: do not issue extra requests inside the retry loop.
@@ -122,6 +135,10 @@ class HttpClient:
                         return result
                     return response.read()
             except HTTPError as exc:
+                if is_gcp:
+                    status = exc.code
+                    exc.close()  # Never read/log a body which can echo the key.
+                    raise GcpRequestError(status) from None
                 if is_clore:
                     status = exc.code
                     exc.close()
@@ -135,14 +152,20 @@ class HttpClient:
                     raise
                 error = exc
             except (URLError, TimeoutError, ConnectionError, OSError, IncompleteRead) as exc:
+                if is_gcp:
+                    raise GcpRequestError() from None
                 if is_clore:
                     raise CloreRequestError(0, bool(credentials)) from None
                 error = exc
             except ValueError:
+                if is_gcp:
+                    raise GcpRequestError() from None
                 if is_clore:
                     raise CloreRequestError(0, bool(credentials)) from None
                 raise
             except Exception:
+                if is_gcp:
+                    raise GcpRequestError() from None
                 if is_clore:
                     raise CloreRequestError(0, bool(credentials)) from None
                 raise
@@ -185,6 +208,8 @@ class HttpClient:
         try:
             payload = json.loads(data)
         except (ValueError, UnicodeError):
+            if urlsplit(url).hostname == 'cloudbilling.googleapis.com':
+                raise GcpRequestError() from None
             if urlsplit(url).hostname == 'api.clore.ai':
                 raise CloreRequestError(0, bool(auth_headers(url))) from None
             raise

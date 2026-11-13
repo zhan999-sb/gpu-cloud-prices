@@ -340,7 +340,7 @@
   "note_ovh": "Offizieller Katalog der französischen Niederlassung in EUR ohne MwSt. Linux-Instanzpreise pro Stunde; genaue Regionen und Bestand unbekannt. Keine abgeleiteten Lokal- oder Dreizonenpreise.",
   "note_vultr": "Offizieller Stundenkatalog mit expliziter GPU-Anzahl. Fehlende Standorte belegen keinen Bestand. Unterbrechbare Preise sind getrennt; ungeprüfte virtuelle GPUs sind ausgeschlossen.",
   "note_hetzner": "Öffentliche dedizierte GPU-Server mit Stundenabrechnung, Monatsobergrenze und zusätzlicher einmaliger Einrichtung. Konfigurationsabhängige Einstiegspreise sind markiert; nur Anzeige.",
-  "note_gcp": "Die offizielle Cloud Billing Catalog API benötigt einen API-Schlüssel eines Google-Cloud-Projekts. Erfassung erst nach dieser manuellen Einrichtung.",
+  "note_gcp": "GPU-Stundenpreise aus dem offiziellen Cloud Billing Catalog, einschlie?lich der GPU-SKUs f?r A3/A2/G2. VM-vCPU/RAM werden separat berechnet. Ohne GCP_BILLING_API_KEY wird die Erfassung ?bersprungen; h?chstens ein Katalogabruf alle sechs Stunden. Kapazit?t unbekannt.",
   "note_alibaba_intl": "Nur Link: Die internationalen Website-Bedingungen verbieten systematische Datenbankerstellung und Crawling. Keine Preiserfassung oder Exporte.",
   "note_tencent_intl": "Nur Link: Internationale Bedingungen beschränken Benchmarking und konkurrierende Nutzung. Anonyme Preise sind ungeprüft; die Preis-API benötigt eine Signatur. Keine Erfassung oder Exporte.",
   "seo_4090_title": "RTX 4090 Cloud-Preis pro Stunde — GPU- und Instanzkosten vergleichen",
