@@ -356,5 +356,11 @@
   "seo_billing_unknown": "Duração mínima de cobrança desconhecida",
   "seo_seconds": "segundos",
   "seo_creator": "Criador da compilação",
-  "seo_temporal": "Período observado"
+  "seo_temporal": "Período observado",
+  "note_sesterce": "Apenas link: as regras de acesso para coleta automática de preços ainda não foram verificadas. Confira configuração, região e preços atuais no catálogo oficial.",
+  "note_seeweb": "Apenas link enquanto a análise de reutilização dos preços públicos estiver incompleta. Verifique a quantidade de GPUs e a configuração selecionada na fonte.",
+  "note_gcore": "Apenas link enquanto a análise de reutilização do site estiver incompleta. Confira o modelo de preços e a configuração oficiais; especificações inconsistentes de várias GPUs são excluídas.",
+  "note_jarvislabs": "Apenas link: as regras de acesso e os termos completos não puderam ser verificados. Confira os preços oficiais e a cobrança para o seu país.",
+  "note_modal": "Apenas link até concluir a análise de acesso. Serverless, cobrança por segundo; GPU, CPU e memória são cobradas separadamente.",
+  "note_koyeb": "Apenas link até concluir a análise de acesso. Serverless, cobrança por segundo; confira especificações da instância, região e preços por hora na fonte."
 }

@@ -599,7 +599,8 @@ def _audit(conn, out):
         # Independent catalog policy checks, without calling the collectors.
         provider = row['provider']
         native = row['original_currency'] or row['currency']
-        if provider in {'gcp', 'alibaba_intl', 'tencent_intl'}:
+        policy = PROVIDERS.get(provider)
+        if policy and (policy['tier'] == 'D' or policy.get('link_only') or not policy['enabled']):
             errors.append(key + ': disabled or link-only provider has observations')
         if provider in {'aws', 'oracle', 'ovh', 'vultr', 'hetzner'}:
             tier = 'B' if provider == 'hetzner' else 'A'

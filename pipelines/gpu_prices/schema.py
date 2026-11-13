@@ -87,6 +87,11 @@ class Offer:
 
 def validate_offer(offer: Offer) -> Offer:
     """Return the offer, or raise ValueError. Zero/NaN placeholder rates are invalid."""
+    # A spoofed row-level B/A flag cannot override a reviewed link-only policy.
+    from .providers.registry import PROVIDERS
+    policy = PROVIDERS.get(offer.provider) if isinstance(offer.provider, str) else None
+    if policy and (policy['tier'] == 'D' or policy.get('link_only')):
+        raise ValueError('link-only provider cannot ingest price observations')
     for name in ("provider", "sku", "gpu_model", "region"):
         value = getattr(offer, name)
         if name == "region" and value is None:

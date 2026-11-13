@@ -1,0 +1,82 @@
+{
+  "checked_at": "2026-11-13",
+  "request": {
+    "public": true,
+    "login": false,
+    "bypass": false
+  },
+  "providers": {
+    "sesterce": {
+      "robots": "unknown",
+      "terms_url": "https://cloud.sesterce.com/terms-of-service",
+      "quote": "Web crawling at a rate that disrupts the servers being crawled",
+      "quote_context": "Security and Interference; rate limitation, not a blanket price-comparison ban.",
+      "hold": [
+        "robots_not_retrieved"
+      ],
+      "source_read": "official web extraction",
+      "source_get": "local socket access denied"
+    },
+    "seeweb": {
+      "robots": "allowed",
+      "robots_excerpt": "User-agent: *\nAllow: /\nDisallow: test-page.php",
+      "terms_url": "https://www.seeweb.it/en/terms-and-conditions",
+      "quote": "The present general conditions are applicable to all services activated, also after the first period of validity.",
+      "quote_context": "Service-contract scope; no explicit public-price scraping/comparison prohibition found in this text. Public website reuse scope is not settled.",
+      "hold": [
+        "public_website_reuse_scope_unresolved",
+        "selected_configuration_not_verified_from_original_response"
+      ],
+      "source_read": "official web extraction",
+      "source_get": "local socket access denied"
+    },
+    "gcore": {
+      "robots": "allowed",
+      "terms_url": "https://gcore.com/legal",
+      "quote": "BY ORDERING OUR SERVICES YOU AGREE TO BE BOUND BY THE LATEST AMENDED VERSION OF THIS AGREEMENT.",
+      "quote_context": "MSA introduction. Legal index lists a separate Copyright Policy; its complete text was not retrieved. This quote is not a price-collection prohibition.",
+      "hold": [
+        "complete_website_reuse_policies_not_retrieved",
+        "pricing_selector_state_not_verified_from_original_response"
+      ],
+      "source_read": "official web extraction",
+      "source_get": "local socket access denied"
+    },
+    "jarvislabs": {
+      "robots": "unknown",
+      "terms_url": "https://jarvislabs.ai/termsandservice",
+      "quote": null,
+      "quote_context": "Official terms request returned HTTP 429 Too Many Requests. No complete current terms quote; no retry or challenge bypass.",
+      "hold": [
+        "robots_not_retrieved",
+        "complete_terms_not_retrieved"
+      ],
+      "source_read": "official web extraction",
+      "source_get": "local socket access denied"
+    },
+    "modal": {
+      "robots": "unknown",
+      "terms_url": "https://modal.com/legal/terms",
+      "quote": "is made generally available to the public without breach of this Agreement",
+      "quote_context": "Section 4 public-information exception; do not misstate all public prices as confidential.",
+      "hold": [
+        "robots_not_retrieved"
+      ],
+      "source_read": "official web extraction",
+      "source_get": "local socket access denied",
+      "future_billing": "serverless, per-second billed; GPU component only, CPU and RAM additional"
+    },
+    "koyeb": {
+      "robots": "unknown",
+      "terms_url": "https://www.koyeb.com/docs/legal/msa",
+      "quote": "not to target the Platform when running a Bot from the Instance",
+      "quote_context": "Section 10.1 applies to a bot running from a rented instance, not a verified blanket restriction on external public-price reading.",
+      "hold": [
+        "robots_not_retrieved"
+      ],
+      "source_read": "official web extraction",
+      "source_get": "local socket access denied",
+      "future_billing": "serverless, per-second billed; prefer separately published hourly price to multiplying rounded per-second display"
+    }
+  }
+}

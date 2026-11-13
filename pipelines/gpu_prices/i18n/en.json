@@ -356,5 +356,11 @@
   "seo_billing_unknown": "Minimum billing duration unknown",
   "seo_seconds": "seconds",
   "seo_creator": "Compilation creator",
-  "seo_temporal": "Observed temporal coverage"
+  "seo_temporal": "Observed temporal coverage",
+  "note_sesterce": "Link only: automated price access has not been cleared. Check the official catalog for configuration, region and current prices.",
+  "note_seeweb": "Link only while review of public-price reuse is incomplete. GPU count and the selected configuration must be verified at the source.",
+  "note_gcore": "Link only while the website reuse review is incomplete. Check the official pricing model and configuration; inconsistent multi-GPU specifications are excluded.",
+  "note_jarvislabs": "Link only: access rules and the complete terms could not be verified. Check official prices and billing for your country.",
+  "note_modal": "Link only pending access review. Serverless, per-second billed; GPU, CPU and memory charges are separate.",
+  "note_koyeb": "Link only pending access review. Serverless, per-second billed; check instance specifications, region and hourly rates at the source."
 }

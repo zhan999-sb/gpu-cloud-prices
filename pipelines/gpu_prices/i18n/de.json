@@ -356,5 +356,11 @@
   "seo_billing_unknown": "Mindestabrechnungsdauer unbekannt",
   "seo_seconds": "Sekunden",
   "seo_creator": "Ersteller der Zusammenstellung",
-  "seo_temporal": "Zeitraum der Beobachtungen"
+  "seo_temporal": "Zeitraum der Beobachtungen",
+  "note_sesterce": "Nur Link: Die Zugriffsregeln für die automatische Preisabfrage sind noch nicht geklärt. Konfiguration, Region und aktuelle Preise stehen im offiziellen Katalog.",
+  "note_seeweb": "Nur Link, solange die Prüfung zur Weiterverwendung öffentlicher Preise offen ist. GPU-Anzahl und gewählte Konfiguration müssen an der Quelle geprüft werden.",
+  "note_gcore": "Nur Link, solange die Prüfung zur Weiterverwendung der Website offen ist. Offizielles Preismodell und Konfiguration prüfen; widersprüchliche Angaben zu mehreren GPUs werden ausgeschlossen.",
+  "note_jarvislabs": "Nur Link: Zugriffsregeln und vollständige Bedingungen konnten nicht geprüft werden. Offizielle Preise und Abrechnung für Ihr Land prüfen.",
+  "note_modal": "Nur Link bis zur Klärung der Zugriffsregeln. Serverless, sekundengenaue Abrechnung; GPU, CPU und Arbeitsspeicher werden getrennt berechnet.",
+  "note_koyeb": "Nur Link bis zur Klärung der Zugriffsregeln. Serverless, sekundengenaue Abrechnung; Instanzdaten, Region und Stundenpreise an der Quelle prüfen."
 }

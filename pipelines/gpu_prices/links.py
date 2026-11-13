@@ -89,7 +89,7 @@ def link_for(provider, sku, region, price_type, *, model=None):
         if provider == "vast":
             parts = urlsplit("https://cloud.vast.ai/")
         params[entry["ref_param"]] = ref
-    if provider not in {'clore', 'anygpu', 'ai_galaxy'}:
+    if provider not in {'clore', 'anygpu', 'ai_galaxy', 'sesterce', 'seeweb', 'gcore', 'jarvislabs', 'modal', 'koyeb'}:
         params.update(utm_source="gpu-cloud-prices", utm_medium="referral", utm_campaign=campaign)
     return {"url": urlunsplit(parts._replace(query=urlencode(params))),
             "label": "view_provider", "provider_name": entry["name"], "is_affiliate": affiliate}

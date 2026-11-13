@@ -356,5 +356,11 @@
   "seo_billing_unknown": "Periodo mínimo de facturación desconocido",
   "seo_seconds": "segundos",
   "seo_creator": "Creador de la recopilación",
-  "seo_temporal": "Periodo observado"
+  "seo_temporal": "Periodo observado",
+  "note_sesterce": "Solo enlace: no se han verificado las reglas de acceso para recopilar precios automáticamente. Consulte la configuración, la región y los precios actuales en el catálogo oficial.",
+  "note_seeweb": "Solo enlace mientras siga pendiente la revisión de reutilización de precios públicos. Verifique el número de GPU y la configuración seleccionada en la fuente.",
+  "note_gcore": "Solo enlace mientras siga pendiente la revisión de reutilización del sitio. Verifique el modelo de precios y la configuración oficiales; se excluyen las especificaciones de varias GPU que sean incoherentes.",
+  "note_jarvislabs": "Solo enlace: no se han podido verificar las reglas de acceso ni las condiciones completas. Consulte los precios oficiales y la facturación de su país.",
+  "note_modal": "Solo enlace hasta completar la revisión de acceso. Serverless, facturación por segundo; GPU, CPU y memoria se cobran por separado.",
+  "note_koyeb": "Solo enlace hasta completar la revisión de acceso. Serverless, facturación por segundo; verifique las especificaciones de la instancia, la región y las tarifas por hora en la fuente."
 }

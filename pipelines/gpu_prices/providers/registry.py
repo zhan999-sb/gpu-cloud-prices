@@ -1,5 +1,13 @@
 """Reviewed policies. Disabled and D providers deliberately have no collector."""
 PROVIDERS = {
+    # b21: unresolved admission evidence; D is a hold, not a finding of a ban.
+    "sesterce": {"name":"Sesterce","tier":"D","enabled":False,"link_only":True,"note":"note_sesterce","source":"https://cloud.sesterce.com/compute"},
+    "seeweb": {"name":"Seeweb","tier":"D","enabled":False,"link_only":True,"note":"note_seeweb","source":"https://www.seeweb.it/en/products/cloud-server-gpu"},
+    "gcore": {"name":"Gcore","tier":"D","enabled":False,"link_only":True,"note":"note_gcore","source":"https://gcore.com/pricing/ai"},
+    "jarvislabs": {"name":"Jarvislabs","tier":"D","enabled":False,"link_only":True,"note":"note_jarvislabs","source":"https://jarvislabs.ai/pricing"},
+    "modal": {"name":"Modal","tier":"D","enabled":False,"link_only":True,"note":"note_modal","source":"https://modal.com/pricing"},
+    "koyeb": {"name":"Koyeb","tier":"D","enabled":False,"link_only":True,"note":"note_koyeb","source":"https://www.koyeb.com/docs/reference/instances"},
+
     "aws": {"name": "AWS EC2", "tier": "A", "enabled": True, "note": "note_aws", "source": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/region_index.json"},
     "gcp": {"name": "Google Cloud", "tier": "A", "enabled": False, "note": "note_gcp", "source": "https://cloud.google.com/compute/gpus-pricing"},
     "hetzner": {"name": "Hetzner", "tier": "B", "enabled": True, "note": "note_hetzner", "source": "https://www.hetzner.com/dedicated-rootserver/matrix-gpu/"},
