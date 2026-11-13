@@ -294,7 +294,7 @@ class Page(HTMLParser):
             block=next((f[1]['data-price-block'] for f in reversed(self.stack) if 'data-price-block' in f[1]),None)
             if block is not None and self.card is None:self.price_block_headings.append([block,text])
         if kind=='summary' and any(f[1].get('class')=='faq' for f in self.stack):self.faq_questions.append(text)
-        if ('data-guide' in a or 'data-stat' in a or 'data-search' in a or 'data-faq' in a or 'data-growth' in a or 'data-price-block' in a or 'data-mirror' in a or a.get('class')=='minimum-instance') and any('hidden' in attrs or attrs.get('aria-hidden')=='true' or re.search(r'(?:display:none|visibility:hidden)',re.sub(r'\s+','',attrs.get('style','')).lower()) for attrs in [a]+[f[1] for f in self.stack]):raise AuditError('Audited content must be visible')
+        if ('data-report' in a or 'data-guide' in a or 'data-stat' in a or 'data-search' in a or 'data-faq' in a or 'data-growth' in a or 'data-price-block' in a or 'data-mirror' in a or a.get('class')=='minimum-instance') and any('hidden' in attrs or attrs.get('aria-hidden')=='true' or re.search(r'(?:display:none|visibility:hidden)',re.sub(r'\s+','',attrs.get('style','')).lower()) for attrs in [a]+[f[1] for f in self.stack]):raise AuditError('Audited content must be visible')
         if 'data-search' in a:
             key=a['data-search']
             if key in self.search_values:raise AuditError('Duplicate search content marker: '+key)

@@ -1,5 +1,45 @@
 # GPU price index — API and page-provider integration
 
+## b25 weekly price reports
+
+Each build derives `/reports/<ISO-year>-W<week>/` and `/reports/` in all eight
+languages from the retained SQLite observations. The current week uses today's
+UTC snapshot; previous weeks use their last retained observation day. No dates
+or prices are interpolated. The homepage links to the current week's report.
+
+Current popular-model minima keep exact variants and on-demand/Spot separate.
+Weekly comparisons require observations exactly seven calendar days apart in
+the same provider/model/allocation/region/type/currency/scope/tax/billing and
+conditions group. Each model/type selects its cheapest current matched group,
+then compares that group's previous minimum. The unrestricted current minimum
+is shown separately. Archived rows are daily group minima, not full catalogs or
+the same machine. Historical offer counts are explicitly retained-group counts.
+Original currency/FX, tax, tier, source, billing and marketplace qualifiers stay
+visible. Listing differences describe observed coverage, never confirmed
+provider launches, closures, stock or delistings; an initial import is not news.
+
+A report needs at least three supported popular model/type comparisons to pass
+the thin-content guard. Thin reports remain readable with explicit noindex and
+are absent from all sitemaps. The index becomes indexable when a report
+qualifies. Reports with observed popular-GPU prices enter the existing
+trailing-month, fifty-item RSS feed with a week-stable GUID, including thin
+reports whose descriptions explicitly explain the missing history.
+Article modification dates are visible observation timestamps; an unrecorded
+publication date is omitted. The index has breadcrumbs without Article markup.
+`report_audit.py` independently
+reconstructs the evidence from the SQL audit view, including table selection,
+numbers, qualifiers, links, visibility, indexability, archives and feed entries.
+
+Local acceptance (single process, fresh temporary directories, no collection):
+
+```powershell
+python -X utf8 -B pipelines/gpu_prices/runtime/b25/verify.py focused6 focused7 full1 build2 audit2
+```
+
+This writes the isolated preview to `runtime/b25/preview/` with canonical origin
+`https://gpu-cloud-prices.pages.dev`, using a SQLite backup of b24's retained
+observations. Phase logs and source/preservation hashes are retained in b25.
+
 ## b20 search intent, Dataset discovery and IndexNow
 
 RTX 4090 desktop pages compare per-GPU hourly rates with the minimum billable

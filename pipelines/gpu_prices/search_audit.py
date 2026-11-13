@@ -97,6 +97,8 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
     entries=_entries(facts);extra=set();routes={};indexed={};parsed={}
     from .guide_audit import snapshot as guide_snapshot, audit_page as audit_guide_page
     guide_data=guide_snapshot(facts,errors)
+    from .report_audit import snapshot as report_snapshot, audit_page as audit_report_page, _week
+    report_data=report_snapshot(facts)
     day=facts['date'];last=facts['last_updated'] or facts['built']
     from .schema import parse_utc
     tracked=sorted({r['provider'] for r in facts['all_rows'] if parse_utc(r['collected_at'])<=parse_utc(facts['built'])})
@@ -109,6 +111,10 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
     for slug in ('',*GUIDES):
         key=GUIDES[slug][0] if slug else 'index'
         routes['/guides/'+(slug+'/' if slug else '')]=('guide',slug,guide_data['counts'][key],guide_data['updated'] or facts['built'])
+    for key in (None,*report_data):
+        ready=report_data[key]['indexable'] if key else any(d['indexable'] for d in report_data.values())
+        modified=report_data[key]['updated'] if key else max((d['updated'] for d in report_data.values() if d['updated']),default=None)
+        routes['/reports/'+(key+'/' if key else '')]=('report',key,3 if ready else 0,modified or facts['built'])
     for model,d in facts['models'].items():
         route='/'+slugs[model]+'/'
         routes[route]=('model',model,d['statistics']['offers'],d['last_updated'] or last)
@@ -134,7 +140,7 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
         allowed=_allowed_literals(tr,facts)|set(SPECS)
         allowed.update(tr.text('compare_label',left=a,right=b) for a,b in PAIRS.values())
         for route,(kind,subject,count,modified) in routes.items():
-            filename=_file(route,lang);is_aux=kind in {'provider','comparison','continuation','data','guide'}
+            filename=_file(route,lang);is_aux=kind in {'provider','comparison','continuation','data','guide','report'}
             if is_aux:extra.add(filename);extra_html+=1
             try:
                 if parsed_main and filename in parsed_main:raw,page=parsed_main[filename]
@@ -166,11 +172,14 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
                                  '404':['WebPage','BreadcrumbList'],
                                  'data':['Dataset','BreadcrumbList'] if facts['exports'] else ['BreadcrumbList']}.get(kind,['BreadcrumbList']))
             if kind=='guide':expected_types=(['Article'] if subject else [])+['BreadcrumbList']
+            if kind=='report':expected_types=(['Article'] if subject else [])+['BreadcrumbList']
             if [d.get('@type') for d in page.structured]!=expected_types:
                 errors.append(filename+': unexpected JSON-LD types/count (A-only Dataset and visible FAQ required)')
             if kind=='guide':
                 expected_search,title,description=audit_guide_page(page,raw,GUIDES[subject][0] if subject else 'index',subject,
                     guide_data,facts,tr,origin,slugs,filename,errors)
+            elif kind=='report':
+                expected_search,title,description=audit_report_page(page,raw,subject,report_data,facts,tr,origin,slugs,filename,errors)
             elif kind=='model':
                 title,intro,trend=model_copy(subject,facts['models'][subject],tr)
                 expected_search={'intro':intro,'trend':trend}
@@ -246,10 +255,12 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
             if kind=='continuation':crumb_items=[(tr.text('nav_home'),'/'),(subject[0],'/'+slugs[subject[0]]+'/'),(title,route)]
             if kind=='guide':
                 crumb_items=[(tr.text('nav_home'),'/'),(tr.text('guide_index_title'),'/guides/')]+([(title,route)] if subject else [])
+            if kind=='report':
+                crumb_items=[(tr.text('nav_home'),'/'),(tr.text('report_index_title'),'/reports/')]+([(title,route)] if subject else [])
             expected_crumb={'@context':'https://schema.org','@type':'BreadcrumbList','inLanguage':lang.code,'url':url,'itemListElement':[{'@type':'ListItem','position':i+1,'name':label,'item':origin+lang.path(path)} for i,(label,path) in enumerate(crumb_items)]}
             crumbs=[d for d in page.structured if d.get('@type')=='BreadcrumbList']
             if crumbs!=[expected_crumb] or page.breadcrumbs!=[' / '.join(label for label,_ in crumb_items)]:errors.append(filename+': breadcrumb mismatch')
-            if is_aux and kind!='guide':
+            if is_aux and kind not in {'guide','report'}:
                 if kind!='data' and any('data-growth' in a for _,a,_ in page.growth_nodes):errors.append(filename+': unexpected growth marker on auxiliary page')
                 if page.title!=tr.text('page_title',title=title,site_name=tr.text('site_name')):errors.append(filename+': auxiliary title mismatch')
                 for k,v in {'og:title':title,'twitter:title':title,'description':description,'og:description':description,'twitter:description':description}.items():
@@ -295,6 +306,10 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
                 errors.append(filename+': missing Guides navigation')
             if kind=='home' and not {lang.path('/guides/'+s+'/') for s in GUIDES}<={a.get('href') for tag,a in page.links if tag=='a'}:
                 errors.append(filename+': missing home Guides section')
+            if kind=='home':
+                latest=[a for tag,a in page.links if tag=='a' and a.get('data-report-latest')=='true']
+                if latest!=[{'data-report-latest':'true','href':lang.path('/reports/'+_week(day)+'/')}]:errors.append(filename+': latest report link mismatch')
+                if lang.path('/reports/') not in {a.get('href') for tag,a in page.links if tag=='a'}:errors.append(filename+': reports index link missing')
     # Exact sitemap membership, lastmod, duplicates and reciprocal hreflang.
     ns={'s':'http://www.sitemaps.org/schemas/sitemap/0.9','x':'http://www.w3.org/1999/xhtml'}
     for filename in ['sitemap.xml']+['sitemap-'+l.code+'.xml' for l in LANGUAGES]:
@@ -337,7 +352,7 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
         _compare(json.loads((out/'indexnow-manifest.json').read_text(encoding='utf-8')),
                  {'version':1,'origin':origin,'pages':expected_hashes},'IndexNow page hashes',errors)
     except (OSError,ValueError):errors.append('IndexNow key/manifest missing or invalid')
-    return extra,dict(extra_html_pages=extra_html,additional_values_checked=additional_values,indexed_pages=len(indexed),noindex_pages=len(parsed)-len(indexed),sitemap_urls=len(indexed),language_sitemaps=8,guide_pages=len(LANGUAGES)*(len(GUIDES)+1))
+    return extra,dict(extra_html_pages=extra_html,additional_values_checked=additional_values,indexed_pages=len(indexed),noindex_pages=len(parsed)-len(indexed),sitemap_urls=len(indexed),language_sitemaps=8,guide_pages=len(LANGUAGES)*(len(GUIDES)+1),report_pages=len(LANGUAGES)*(len(report_data)+1),indexable_reports=sum(d['indexable'] for d in report_data.values())*len(LANGUAGES))
 
 
 def _audit_image(pixels, model, data, errors, filename):

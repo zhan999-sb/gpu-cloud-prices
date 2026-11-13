@@ -57,19 +57,26 @@ def _notices(facts):
 def _feed_expected(items, slugs, origin, tr):
     from .audit import _dollars
     root=ET.Element('rss',version='2.0');channel=ET.SubElement(root,'channel')
-    for k,v in [('title',tr.text('growth_feed_title')),('link',origin+tr.language.path('/data/')),('description',tr.text('growth_feed_rules')),('language',tr.language.code)]:
+    for k,v in [('title',tr.text('growth_feed_title')),('link',origin+tr.language.path('/data/')),('description',tr.text('growth_feed_rules')+' '+tr.text('report_feed_rules')),('language',tr.language.code)]:
         ET.SubElement(channel,k).text=v
     for item in items:
         node=ET.SubElement(channel,'item');reason=item['reason']
-        if reason=='provider':
+        if reason=='report':
+            title=tr.text('report_title',week=item['week'])
+            path='/reports/'+item['week']+'/'
+        elif reason=='provider':
             title=tr.text('growth_feed_provider',provider=PROVIDERS[item['provider']]['name'],date=item['day'])
             slug='clore-ai' if item['provider']=='clore' else item['provider'].replace('_','-')
             path='/providers/'+slug+'/'
         else:
             title=tr.text('growth_feed_'+reason,model=item['model'],kind=tr.text(item['kind']),price=_dollars(item['price']),before=_dollars(item['before']),date=item['day'])
             path='/'+slugs[item['model']]+'/'
-        key=sha256(json.dumps(item,sort_keys=True,separators=(',',':')).encode()).hexdigest()
-        for k,v in [('title',title),('link',origin+tr.language.path(path)),('guid',origin+'/feed.xml#'+key),('pubDate',format_datetime(parse_utc(item['day']+'T00:00:00Z'),usegmt=True)),('description',title+' '+tr.text('growth_feed_limits'))]:
+        identity={'reason':'report','week':item['week']} if reason=='report' else item
+        key=sha256(json.dumps(identity,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+        description=title+' '+tr.text('report_intro' if reason=='report' else 'growth_feed_limits')
+        if reason=='report' and not item['indexable']:description+=' '+tr.text('report_thin')
+        if reason=='report' and not item['baseline']:description+=' '+tr.text('report_short')
+        for k,v in [('title',title),('link',origin+tr.language.path(path)),('guid',origin+'/feed.xml#'+key),('pubDate',format_datetime(parse_utc(item['day']+'T00:00:00Z'),usegmt=True)),('description',description)]:
             child=ET.SubElement(node,k);child.text=v
             if k=='guid':child.set('isPermaLink','false')
     return ET.tostring(root,encoding='unicode')
@@ -91,6 +98,8 @@ def audit_audience(facts, manifest, out, errors, parsed_main):
     except (OSError,ValueError):errors.append('data/latest.json: missing/invalid index')
     checked+=len(expected_index['exports'])
     notices=_notices(facts)
+    from .report_audit import snapshot as report_snapshot, feed_events as report_events
+    notices=sorted(notices+report_events(report_snapshot(facts),facts['date']),key=lambda e:(-date.fromisoformat(e['day']).toordinal(),json.dumps(e,sort_keys=True)))[:50]
     main_files={lang.path('/').lstrip('/')+'index.html' for lang in LANGUAGES}
     main_files.update(lang.path('/'+slug+'/').lstrip('/')+'index.html' for lang in LANGUAGES for slug in slugs.values())
     for filename,(_,page) in parsed_main.items():
@@ -117,7 +126,7 @@ def audit_audience(facts, manifest, out, errors, parsed_main):
             raw=(out/datafile).read_text(encoding='utf-8');page=Page(raw)
             required=('growth_data_title','growth_data_intro','growth_cadence','growth_license','growth_attribution',
                       'growth_fields_title','growth_fields_top','growth_fields_prices','growth_fields_hardware',
-                      'growth_fields_policy','growth_fields_time','growth_fields_stats','growth_exports_title','growth_feed_rules')
+                      'growth_fields_policy','growth_fields_time','growth_fields_stats','growth_exports_title','growth_feed_rules','report_feed_rules')
             if any(tr.text(k) not in page.text for k in required):errors.append(datafile+': missing data documentation/rights qualifiers')
             links=[a for tag,a in page.links if tag=='a']
             found=[a['href'] for a in links if a.get('href','').startswith(origin+'/data/') and a.get('href','').endswith('.json')]

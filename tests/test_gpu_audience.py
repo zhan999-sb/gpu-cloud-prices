@@ -51,7 +51,7 @@ def test_embeds_data_feeds_badges_in_eight_languages(growth_site):
     assert result['audit']['status']=='passed'
     assert result['audit']['embed_pages']==5*8
     assert result['audit']['max_embed_bytes']<15_000
-    assert result['audit']['feed_items']==2  # one 15% drop and one newly observed provider
+    assert result['audit']['feed_items']==4  # two daily events and two honest weekly reports
     assert result['audit']['price_drop_badges']==2*8
     assert result['html_pages']==result['audit']['indexed_pages']+result['audit']['noindex_pages']
     assert sum(result['html_pages_by_language'].values())==result['html_pages']
@@ -80,7 +80,10 @@ def test_embeds_data_feeds_badges_in_eight_languages(growth_site):
         code=next(n for n in model.growth_nodes if n[0]=='textarea')
         assert ORIGIN+audience.embed_path('h100-sxm-80gb',lang) in code[2] and 'readonly' in code[1]
         root=ET.parse(folder/lang.prefix/'feed.xml').getroot()
-        assert len(root.findall('channel/item'))==2
+        items=root.findall('channel/item')
+        weekly=[n for n in items if '/reports/' in n.findtext('link')]
+        assert len(items)==4 and len(weekly)==2
+        assert all(tr.text('report_thin') in n.findtext('description') for n in weekly)
         assert 'B-only' not in ET.tostring(root,encoding='unicode')
         assert root.findtext('channel/language')==lang.code
         sitemap=(folder/('sitemap-'+lang.code+'.xml')).read_text(encoding='utf-8')

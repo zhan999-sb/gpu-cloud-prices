@@ -23,7 +23,7 @@ from .monthly import monthly_quotes
 from .providers.registry import PROVIDERS
 from .partners import surflare
 from .models import category, popular_rank, headline_order, POPULAR, CATEGORIES, model_family
-from . import search, audience, guides
+from . import search, audience, guides, reports
 from .guide_specs import GUIDES, reference_rows
 from .search_specs import PAIRS, REFERENCES, SPECS
 
@@ -64,7 +64,7 @@ def model_slugs(models) -> dict[str, str]:
     model's unambiguous URL (e.g. 'GPU 2' alongside two variants of 'GPU').
     """
     ordered = sorted(set(models), key=lambda model: (model.casefold(), model))
-    reserved = {"guides", "data", "embed", "feed", "latest", "index", "methodology", "404", "robots", "sitemap", "providers", "compare", "social"} | {lang.prefix for lang in LANGUAGES if lang.prefix}
+    reserved = {"reports", "guides", "data", "embed", "feed", "latest", "index", "methodology", "404", "robots", "sitemap", "providers", "compare", "social"} | {lang.prefix for lang in LANGUAGES if lang.prefix}
     natural = {model_slug(model) for model in ordered}
     used, result = set(reserved), {}
     for model in ordered:
@@ -797,7 +797,9 @@ def build_site(store: PriceStore, out: str | Path = DEFAULT_OUT, *, today: str |
             artifact['currency'] = next(iter({o.currency for o in permitted})) if len({o.currency for o in permitted})==1 else 'USD' if not permitted else 'MULTI'
             artifact['latest_collection'] = max((r for r in store.provider_runs().values() if r['provider'] in {o.provider for o in history_rows}),key=lambda r:r['id'],default=None)
     index=audience.data_index(exports,origin,today,built)
+    report_data=reports.snapshot(observed_rows,[o.to_dict() for o in offers],today,built)
     feed_items=audience.events({d['gpu_model']:d for d in exports.values()},observed_rows,today,built)
+    feed_items=sorted(feed_items+reports.feed_events(report_data,today),key=lambda e:(-date.fromisoformat(e['day']).toordinal(),json.dumps(e,sort_keys=True)))[:50]
     last_updated = max((r['collected_at'] for r in observed_rows),default=None)
     tracked = sorted({r['provider'] for r in observed_rows})
     site_noindex = sum(d['statistics']['offers'] for d in model_data.values()) < 3
@@ -806,6 +808,7 @@ def build_site(store: PriceStore, out: str | Path = DEFAULT_OUT, *, today: str |
         tr = catalogs[lang.code]
         coverage = _coverage(run, tr)
         body, title, description = _home(offers, models, slugs, today, coverage + _provider_coverage(provider_coverage, tr), tr, model_data, monthly)
+        body+='<section><h2><a href="'+lang.path('/reports/')+'">'+tr.html('report_index_title')+'</a></h2><p><a data-report-latest="true" href="'+lang.path('/reports/'+reports.week(today)+'/')+'">'+tr.html('report_latest')+'</a></p></section>'
         website = {"@context": "https://schema.org", "@type": "WebSite", "name": tr.text("site_name"),
                    "url": origin + lang.path(), "description": description, "inLanguage": lang.code}
         pages[_page_file(lang.path())] = _page(title, body, last_updated, built, origin=origin, route="/", tr=tr,
@@ -857,6 +860,16 @@ def build_site(store: PriceStore, out: str | Path = DEFAULT_OUT, *, today: str |
             pages[_page_file(lang.path(route))] = _page(title,body,updated,built,origin=origin,route=route,tr=tr,
                 description=description,structured=structured,noindex=count<3,crumbs=crumbs)
             if count>=3: sitemap_entries[lang.path(route)]=(updated or built,route)
+        for key in (None,*report_data):
+            route='/reports/'+(key+'/' if key else '')
+            title,description,body,indexable=reports.render(key,report_data,slugs,tr,stat=_stat,table=_table)
+            updated=report_data[key]['updated'] if key else max((d['updated'] for d in report_data.values() if d['updated']),default=None)
+            crumbs=[(tr.text('nav_home'),'/'),(tr.text('report_index_title'),'/reports/')]
+            if key:crumbs.append((title,route))
+            pages[_page_file(lang.path(route))]=_page(title,body,updated,built,origin=origin,route=route,tr=tr,
+                description=description,structured=reports.article(key,report_data[key],tr,origin) if key else None,
+                noindex=not indexable,crumbs=crumbs)
+            if indexable:sitemap_entries[lang.path(route)]=(updated or built,route)
         method_title = tr.text("method_title")
         method_description = tr.text("method_description", count=tr.quantity("offer_count", len([o for o in offers if eligible(o)])),
                                      models=tr.quantity("model_count", len({o.gpu_model for o in offers if eligible(o)})),

@@ -134,7 +134,7 @@ def data_body(index, tr):
     body += '<h2>' + tr.html('growth_exports_title') + '</h2><ul>'
     for item in index['exports']:
         body += '<li data-growth="export"><a href="' + escape(item['url'], quote=True) + '">' + escape(item['url']) + '</a> · ' + escape(item['last_updated']) + '</li>'
-    return body + '</ul><p>' + tr.html('growth_feed_rules') + '</p><p><a href="' + tr.language.path('/feed.xml') + '">' + tr.html('growth_feed_title') + '</a></p>'
+    return body + '</ul><p>' + tr.html('growth_feed_rules') + '</p><p>'+tr.html('report_feed_rules')+'</p><p><a href="'+tr.language.path('/reports/')+'">'+tr.html('report_index_title')+'</a></p><p><a href="' + tr.language.path('/feed.xml') + '">' + tr.html('growth_feed_title') + '</a></p>'
 
 
 def price_drop(data, row, day):
@@ -195,22 +195,29 @@ def feed(items, slugs, origin, day, tr):
     root = ET.Element('rss', {'version': '2.0'})
     channel = ET.SubElement(root, 'channel')
     for key, value in (('title', tr.text('growth_feed_title')), ('link', origin + tr.language.path('/data/')),
-                       ('description', tr.text('growth_feed_rules')), ('language', tr.language.code)):
+                       ('description', tr.text('growth_feed_rules')+' '+tr.text('report_feed_rules')), ('language', tr.language.code)):
         ET.SubElement(channel, key).text = value
     for event in items:
         node = ET.SubElement(channel, 'item')
         reason = event['reason']
-        if reason == 'provider':
+        if reason == 'report':
+            title = tr.text('report_title', week=event['week'])
+            route = '/reports/' + event['week'] + '/'
+        elif reason == 'provider':
             title = tr.text('growth_feed_provider', provider=PROVIDERS[event['provider']]['name'], date=event['day'])
             route = '/providers/' + ('clore-ai' if event['provider'] == 'clore' else event['provider'].replace('_', '-')) + '/'
         else:
             title = tr.text('growth_feed_' + reason, model=event['model'], kind=tr.text(event['kind']),
                             price=money(event['price']), before=money(event['before']), date=event['day'])
             route = '/' + slugs[event['model']] + '/'
-        identity = sha256(json.dumps(event, sort_keys=True, separators=(',', ':')).encode('utf-8')).hexdigest()
+        identity_data = {'reason':'report','week':event['week']} if reason == 'report' else event
+        identity = sha256(json.dumps(identity_data, sort_keys=True, separators=(',', ':')).encode('utf-8')).hexdigest()
         ET.SubElement(node, 'title').text = title
         ET.SubElement(node, 'link').text = origin + tr.language.path(route)
         ET.SubElement(node, 'guid', {'isPermaLink': 'false'}).text = origin + '/feed.xml#' + identity
         ET.SubElement(node, 'pubDate').text = format_datetime(parse_utc(event['day'] + 'T00:00:00Z'), usegmt=True)
-        ET.SubElement(node, 'description').text = title + ' ' + tr.text('growth_feed_limits')
+        description=title+' '+tr.text('report_intro' if reason=='report' else 'growth_feed_limits')
+        if reason=='report' and not event['indexable']:description+=' '+tr.text('report_thin')
+        if reason=='report' and not event['baseline']:description+=' '+tr.text('report_short')
+        ET.SubElement(node, 'description').text = description
     return '<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(root, encoding='unicode') + '\n'

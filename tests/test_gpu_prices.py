@@ -344,7 +344,7 @@ def test_site_from_fixtures_cheapest_html_json_and_history(tmp_path):
                       offer(collected_at="2026-11-11T08:00:00Z", price_per_hour=40, price_per_gpu_hour=5)])
         store.record_run(provider="azure", started_at=STAMP, status="limited", pages=3, records=3)
         result = build_site(store, tmp_path, today=TODAY, built_at=STAMP)
-    assert result["offers_today"] == 2 and result["html_pages"] == 17 * len(LANGUAGES)
+    assert result["offers_today"] == 2 and result["html_pages"] == 19 * len(LANGUAGES)
     index = (tmp_path / "index.html").read_text(encoding="utf-8")
     assert '/statistics/cheapest/on_demand" data-format="money">$3.00</span>' in index
     assert '/statistics/cheapest/spot" data-format="money">$1.00</span>' in index
@@ -823,6 +823,8 @@ def assert_multilingual_site(root, origin, models):
     routes |= ({'/providers/azure/'} if models else set()) | {'/compare/'+slug+'/' for slug in PAIRS}
     from pipelines.gpu_prices.guide_specs import GUIDES
     routes |= {'/guides/'} | {'/guides/'+slug+'/' for slug in GUIDES}
+    # These fixtures retain only dates in ISO week 46; both new routes are thin.
+    routes |= {'/reports/', '/reports/2026-W46/'}
     all_pages = {origin + lang.path(route): (lang, route) for lang in LANGUAGES for route in routes}
     assert len(list(root.rglob("*.html"))) == len(all_pages) + len(models) * len(LANGUAGES)
     parsed, metadata, contact_bytes = {}, {}, set()
@@ -921,7 +923,7 @@ def test_every_language_page_reciprocal_metadata_links_sitemap_and_contact(tmp_p
         store.record_run(provider="azure", started_at=STAMP, status="limited", pages=3, records=6)
         result = build_site(store, tmp_path, today=TODAY, built_at=STAMP)
     assert_multilingual_site(tmp_path, origin, model_slugs(names))
-    assert result["html_pages_by_language"] == {lang.code: 23 for lang in LANGUAGES}
+    assert result["html_pages_by_language"] == {lang.code: 25 for lang in LANGUAGES}
     assert len(list((tmp_path / "data").glob("*.json"))) == len(names) + 1
     catalogs = load_catalogs()
     for lang in LANGUAGES:
@@ -1078,7 +1080,7 @@ def test_headlines_keep_demand_and_spot_separate_and_audit_raw_precision(tmp_pat
         store.upsert(values)
         result = build_site(store, tmp_path, today=TODAY, built_at=STAMP)
         assert result["audit"]["status"] == "passed"
-        assert audit_site(store.connection, tmp_path)["html_pages"] == 136
+        assert audit_site(store.connection, tmp_path)["html_pages"] == 152
     text = (tmp_path / "h100-sxm-80gb/index.html").read_text(encoding="utf-8")
     page = Metadata(text)
     assert "$2.27" in page.meta['description'] and "H100 Cloud Rental Prices" in page.titles[0]
