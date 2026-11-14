@@ -8,7 +8,7 @@ from .regions import eligible
 from .reports import week
 from .providers.registry import PROVIDERS
 from .search import provider_slug
-from .workload_specs import (WORKLOADS, SOURCES, GUIDE_LINKS, route, WORKLOAD_CAPACITY,
+from .workload_specs import (WORKLOADS, WORKLOAD_FAMILIES, SAME_ARCHITECTURE, SOURCES, GUIDE_LINKS, route, WORKLOAD_CAPACITY,
     GPU_SOFTWARE, VLLM_CUDA_MIN, VLLM_ROCM_TARGETS, PYTORCH_CUDA_TARGETS, PYTORCH_ARM_TARGETS,
     INSTANCE_VRAM_PROVIDERS, PYTORCH_ROCM_TARGETS, capacity_spec, gpu_software, screened_capacity, model_identity, PCIE_ONLY, REVIEWED_MODELS)
 
@@ -56,8 +56,21 @@ def snapshot(model_data):
     result={}
     for slug,spec in WORKLOADS.items():
         weights=spec['parameters']*spec['bits']/8 if spec['kind']=='estimate' else None
+        unquantized=quantized_weights=unquantized_weights=None
+        if spec.get('bits')==4:
+            unquantized=spec['vocab']*spec['hidden']*(1 if spec['tie_word_embeddings'] else 2)
+            unquantized_weights=unquantized*2/1e9
+            quantized_weights=(spec['parameters']*1e9-unquantized)*.5/1e9
+            weights=quantized_weights+unquantized_weights
         kv=2*spec['layers']*spec['kv_heads']*spec['head_dim']*spec['kv_bytes']*spec['context']/1e9 if weights is not None else None
-        required=weights*1.2+kv if weights is not None else spec['required']
+        estimate=weights*1.2+kv if weights is not None else spec['required']
+        vendor_gb=None
+        if (spec.get('context'),spec.get('batch'))==spec.get('vendor_setting'):
+            measurements=(spec['vendor_bf16'],) if spec['bits']==16 else (spec['vendor_gptq'],spec['vendor_awq'])
+            # Qwen sums peak allocated bytes over all GPUs, then divides by
+            # 1024**3. Use total GiB -> decimal GB, never divide by GPU count.
+            vendor_gb=max(m for m,n in measurements)*1024**3/1e9
+        required=max(estimate,vendor_gb or 0)
         candidates={g:[] for g in ('single','multi','memory_only')}
         for p,r,v in entries:
             ok=software(r,spec); n=r['gpu_count']
@@ -81,7 +94,8 @@ def snapshot(model_data):
         count=len({(r['gpu_model'],r['price_type']) for p,r in selected})
         cards={p:r for p,r in selected+[(d['path'],d['offer']) for d in rows['memory_only']]+[e for g in ('single','multi') for e in heads[g].values() if e]}
         current=[r for g in ('single','multi') for p,r,v in candidates[g]]
-        result[slug]=dict(required=required,weights=weights,kv=kv,parameters=spec.get('parameters'),
+        result[slug]=dict(required=required,estimate=estimate,vendor_gb=vendor_gb,weights=weights,kv=kv,
+            unquantized_parameters=unquantized,unquantized_weights=unquantized_weights,quantized_weights=quantized_weights,parameters=spec.get('parameters'),
             bytes=spec.get('bits',0)/8,context=spec.get('context'),rows=rows,heads=heads,
             models=sorted({r['gpu_model'] for p,r in selected}),selected=selected,
             cards=sorted(cards.items(),key=instance_rank),count=count,offers=len({p for g in ('single','multi') for p,r,v in candidates[g]}),
@@ -102,9 +116,14 @@ def snapshot(model_data):
     return result
 
 
+def family_links(tr):
+    return ''.join('<li data-workload-family="'+family+'"><strong>'+tr.html('workload_family_'+family)+'</strong><ul>'+''.join(
+        '<li><a href="'+tr.language.path(route(slug))+'">'+tr.html('workload_'+WORKLOADS[slug]['key']+'_title')+'</a></li>'
+        for slug in members)+'</ul></li>' for family,members in WORKLOAD_FAMILIES.items())
+
+
 def entry_points(tr):
-    return '<section data-workload-entry="true"><h2>'+tr.html('workload_entry_title')+'</h2><p>'+tr.html('workload_entry_intro')+'</p><ul>'+''.join(
-        '<li><a href="'+tr.language.path(route(slug))+'">'+tr.html('workload_'+s['key']+'_title')+'</a></li>' for slug,s in WORKLOADS.items())+'</ul></section>'
+    return '<section data-workload-entry="true"><h2>'+tr.html('workload_entry_title')+'</h2><p>'+tr.html('workload_entry_intro')+'</p><ul>'+family_links(tr)+'</ul></section>'
 
 
 def description(slug,data,tr,day):
@@ -123,15 +142,46 @@ def render(slug,data,slugs,tr,day,*,stat,table,card):
     def text(key,tag='p',**values):
         nonlocal body
         body+='<'+tag+' data-search="workload:'+key+'">'+tr.rich('workload_'+key,**values)+'</'+tag+'>'
-    def metric(key): return stat(base+'/'+key,data[key],'decimal3' if key in ('kv','required') else 'number')
+    def metric(key): return stat(base+'/'+key,data[key],'text' if key=='unquantized_parameters' or key=='parameters' and 'parameter_count' in spec else 'decimal3' if key in ('kv','required','estimate','vendor_gb','unquantized_weights','quantized_weights') else 'number')
+    def source_link(key):
+        label,url=SOURCES[key]
+        return '<a href="'+escape(url,quote=True)+'">'+tr.html(label)+'</a>'
     text('intro',model=escape(spec['model']));text('basis');text('requirement','h2')
     if spec['kind']=='estimate':
-        text('weight_rule',parameters=metric('parameters'),bytes=metric('bytes'),weights=metric('weights'),kv=metric('kv'),memory=metric('required'),context=metric('context'))
+        if spec['bits']==4:
+            text('weight_rule_4bit',parameters=metric('parameters'),vocab=str(spec['vocab']),hidden=str(spec['hidden']),
+                copies='1' if spec['tie_word_embeddings'] else '2',tied=str(spec['tie_word_embeddings']).lower(),
+                unquantized=metric('unquantized_parameters'),unquantized_weights=metric('unquantized_weights'),
+                quantized_weights=metric('quantized_weights'),weights=metric('weights'),kv=metric('kv'),context=metric('context'),memory=metric('estimate'))
+            text('weight_inputs',sources='; '.join(source_link(s) for s in spec['weight_input_sources']))
+            if slug.startswith('llama-'): text('rounded_parameters')
+            for fmt,source,size in spec.get('checkpoint_sizes',()):
+                text('checkpoint_'+fmt.lower(),source=source_link(source),size=str(size),memory=f'{size/1e9:.6f}')
+        else:
+            text('weight_rule',parameters=metric('parameters'),bytes=metric('bytes'),weights=metric('weights'),kv=metric('kv'),memory=metric('required'),context=metric('context'))
+        if 'parameter_count' in spec:
+            text('exact_inputs',parameters=str(spec['parameter_count']),hidden=str(spec['hidden']),intermediate=str(spec['intermediate']),
+                vocab=str(spec['vocab']),context=str(spec['context']),maximum=str(spec['max_context']))
         text('weight_caveat')
         text('kv_formula',layers=escape(str(spec['layers'])),heads=escape(str(spec['kv_heads'])),dim=escape(str(spec['head_dim'])),context=escape(str(spec['context'])),kv=escape(format(data['kv'],'.3f').rstrip('0').rstrip('.')))
         if spec['kv_per_1k'] is not None: text('kv_blog')
         if spec['parameters']==13: text('kv_llama2')
         text('architecture',heads=escape(str(spec['heads'])),kv_heads=escape(str(spec['kv_heads'])))
+        if spec.get('same_as'):
+            text('same_estimate',models='; '.join('<a href="'+escape(SOURCES[s][1],quote=True)+'">'+escape(SAME_ARCHITECTURE[s].split('/')[-1])+'</a>' for s in spec['same_as']))
+        if 'vendor_bf16' in spec:
+            text('vendor_context',developer='Qwen',source=source_link('qwen_benchmark'),code=source_link('qwen_benchmark_code'))
+            if spec['bits']==16:
+                memory,n=spec['vendor_bf16'];text('vendor_bf16',developer='Qwen',memory=f'{memory:.2f}',gpus=str(n))
+            else:
+                memory,n=spec['vendor_gptq'];awq,awq_n=spec['vendor_awq']
+                text('vendor_4bit',developer='Qwen',memory=f'{memory:.2f}',gpus=str(n),awq=f'{awq:.2f}',awq_gpus=str(awq_n))
+            if data['vendor_gb'] is not None:
+                text('vendor_screen',estimate=metric('estimate'),vendor=metric('vendor_gb'),memory=metric('required'))
+                if n*80<data['required']: text('vendor_smaller',developer='Qwen',gpus=str(n))
+        if spec.get('vendor_overview'):
+            source=SOURCES[spec['vendor_overview']]
+            text('vendor_mistral',developer='Mistral AI',source=source_link(spec['vendor_overview']))
         if spec['bits']==4: text('quant_caveat')
         text('floor_llm')
     else:

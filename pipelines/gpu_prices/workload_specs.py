@@ -11,6 +11,8 @@ SOURCES = {
     'llama2': ('workload_source_model', 'https://arxiv.org/html/2307.09288'),
     'architecture': ('workload_source_architecture', 'https://raw.githubusercontent.com/meta-llama/llama-models/main/models/sku_list.py'),
     'llama2_architecture': ('workload_source_llama2_architecture', 'https://raw.githubusercontent.com/meta-pytorch/gpt-fast/main/model.py'),
+    'llama_embeddings': ('workload_source_embeddings', 'https://raw.githubusercontent.com/meta-llama/llama-models/main/models/llama3/model.py'),
+    'llama2_embeddings': ('workload_source_embeddings', 'https://raw.githubusercontent.com/meta-llama/llama/main/llama/model.py'),
     'memory': ('workload_source_memory', 'https://huggingface.co/docs/accelerate/usage_guides/model_size_estimator'),
     'vllm': ('workload_source_vllm', 'https://docs.vllm.ai/en/stable/getting_started/installation/gpu/'),
     'tp': ('workload_source_tp', 'https://docs.vllm.ai/en/stable/serving/parallelism_scaling/'),
@@ -50,8 +52,99 @@ for _size, _model, _heads, _kv_heads, _context, _kv_per_1k in (
             context=_context, batch=1, kv_bytes=2, kv_per_1k=_kv_per_1k,
             sources=(('llama2', 'llama2_architecture') if _size == 13 else ('llama31', 'architecture'))+('memory', 'vllm', 'tp', 'pytorch'),
             kind='estimate')
+        if _bits == 4:
+            # Public Meta architecture + separate input/output matrices verify
+            # these inputs without accessing gated HF configs. Preserve P's
+            # existing rounded size and the FP16 pages' inputs and arithmetic.
+            WORKLOADS[_slug].update(hidden=5120 if _size == 13 else 4096 if _size == 8 else 8192,
+                vocab=32000 if _size == 13 else 128256, tie_word_embeddings=False,
+                weight_input_sources=('architecture', 'llama2_embeddings' if _size == 13 else 'llama_embeddings'))
+            WORKLOADS[_slug]['sources'] += ('architecture', 'llama2_embeddings') if _size == 13 else ('llama_embeddings',)
 WORKLOADS['whisper-large'] = dict(key='whisper', model='Whisper large', required=10,
     sources=('whisper', 'pytorch', 'ada', 'pytorch_rocm'), kind='vendor_approximate')
+
+# Exact counts derived from the official configs (including embeddings, output
+# projection, RMSNorm and Qwen Q/K/V biases), cross-checked against the official
+# BF16 safetensors index total_size / 2. Never use the rounded marketing size.
+MODEL_CONFIGS = {
+    'qwen2-5-7b': dict(repo='Qwen/Qwen2.5-7B-Instruct', model='Qwen2.5 7B Instruct',
+        parameter_count=7615616512, layers=28, heads=28, kv_heads=4, head_dim=128,
+        hidden=3584, intermediate=18944, vocab=152064, max_context=32768,
+        vendor_bf16=(15.38, 1), vendor_gptq=(6.52, 1), vendor_awq=(6.39, 1),
+        same_as=('deepseek_qwen_7b',)),
+    'qwen2-5-14b': dict(repo='Qwen/Qwen2.5-14B-Instruct', model='Qwen2.5 14B Instruct',
+        parameter_count=14770033664, layers=48, heads=40, kv_heads=8, head_dim=128,
+        hidden=5120, intermediate=13824, vocab=152064, max_context=32768,
+        vendor_bf16=(29.50, 1), vendor_gptq=(11.36, 1), vendor_awq=(11.22, 1),
+        same_as=('deepseek_qwen_14b',)),
+    'qwen2-5-32b': dict(repo='Qwen/Qwen2.5-32B-Instruct', model='Qwen2.5 32B Instruct',
+        parameter_count=32763876352, layers=64, heads=40, kv_heads=8, head_dim=128,
+        hidden=5120, intermediate=27648, vocab=152064, max_context=32768,
+        vendor_bf16=(63.72, 1), vendor_gptq=(21.09, 1), vendor_awq=(20.81, 1),
+        same_as=('deepseek_qwen_32b',)),
+    'qwen2-5-72b': dict(repo='Qwen/Qwen2.5-72B-Instruct', model='Qwen2.5 72B Instruct',
+        parameter_count=72706203648, layers=80, heads=64, kv_heads=8, head_dim=128,
+        hidden=8192, intermediate=29568, vocab=152064, max_context=32768,
+        vendor_bf16=(140.00, 2), vendor_gptq=(42.50, 1), vendor_awq=(42.13, 1), same_as=()),
+    'mistral-7b-instruct-v0-3': dict(repo='mistralai/Mistral-7B-Instruct-v0.3', model='Mistral 7B Instruct v0.3',
+        parameter_count=7248023552, layers=32, heads=32, kv_heads=8, head_dim=128,
+        hidden=4096, intermediate=14336, vocab=32768, max_context=32768, same_as=(),
+        vendor_overview='mistral_overview'),
+}
+SAME_ARCHITECTURE = {
+    **{f'deepseek_qwen_{n}b': f'deepseek-ai/DeepSeek-R1-Distill-Qwen-{n}B' for n in (7, 14, 32)},
+}
+# Anonymous official AWQ / GPTQ-Int4 safetensors metadata, checked 2026-11-14.
+# Storage cross-checks only: packing, scale tensors and padding differ from
+# the analytical split (the 72B quantized repos pad intermediate_size to 29696).
+QWEN_4BIT_INDEX_SIZES = {
+    'qwen2-5-7b': (5570747392, 5575277568),
+    'qwen2-5-14b': (9980028928, 9988581376),
+    'qwen2-5-32b': (19328804864, 19343747072),
+    'qwen2-5-72b': (41595518976, 41620750336),
+}
+for _key, _repo in SAME_ARCHITECTURE.items():
+    SOURCES[_key] = ('workload_source_'+_key, f'https://huggingface.co/{_repo}/blob/main/config.json')
+SOURCES['qwen_benchmark'] = ('workload_source_qwen_benchmark', 'https://qwen.readthedocs.io/en/v2.5/benchmark/speed_benchmark.html')
+SOURCES['qwen_benchmark_code'] = ('workload_source_qwen_benchmark_code', 'https://github.com/QwenLM/Qwen2.5/blob/main/examples/speed-benchmark/speed_benchmark_transformers.py')
+SOURCES['mistral_overview'] = ('workload_source_mistral_overview', 'https://docs.mistral.ai/models/mistral-7b-0-3')
+for _slug, _config in MODEL_CONFIGS.items():
+    _config['tie_word_embeddings'] = False
+    if _slug.startswith('qwen'):
+        _config['vendor_setting'] = (8192, 1)
+    for _suffix, _label, _file in (
+            ('card', 'workload_source_card', ''),
+            ('config', 'workload_source_config', '/blob/main/config.json'),
+            ('index', 'workload_source_index', '/blob/main/model.safetensors.index.json')):
+        SOURCES[_slug+'_'+_suffix] = (_label, 'https://huggingface.co/'+_config['repo']+_file)
+    for _precision, _bits in (('fp16', 16), ('4bit', 4)):
+        WORKLOADS[_slug+'-'+_precision] = dict(_config,
+            key=_slug.replace('-', '_')+'_'+_precision, bits=_bits,
+            parameters=_config['parameter_count']/1e9, context=min(8192, _config['max_context']),
+            batch=1, kv_bytes=2, kv_per_1k=None, kind='estimate',
+            sources=tuple(_slug+'_'+s for s in ('card', 'config', 'index'))+
+                (('qwen_benchmark', 'qwen_benchmark_code') if _slug.startswith('qwen') else (_config['vendor_overview'],))+
+                _config['same_as']+('memory', 'vllm', 'tp', 'pytorch'))
+        if _bits == 4:
+            WORKLOADS[_slug+'-'+_precision]['weight_input_sources'] = (_slug+'_config',)
+            if _slug in QWEN_4BIT_INDEX_SIZES:
+                _indices=[]
+                for _format,_size in zip(('AWQ','GPTQ'), QWEN_4BIT_INDEX_SIZES[_slug]):
+                    _source=_slug+'_'+_format.lower()+'_index'
+                    _repo=_config['repo']+'-'+('GPTQ-Int4' if _format=='GPTQ' else _format)
+                    SOURCES[_source]=('workload_source_'+_format.lower()+'_index', 'https://huggingface.co/'+_repo+'/blob/main/model.safetensors.index.json')
+                    _indices.append((_format,_source,_size))
+                WORKLOADS[_slug+'-'+_precision]['checkpoint_sizes']=tuple(_indices)
+                WORKLOADS[_slug+'-'+_precision]['sources']+=tuple(s for f,s,n in _indices)
+
+# Shared family membership; labels are localized in every catalogue. The
+# independent audit checks these groups and all entry links and labels.
+WORKLOAD_FAMILIES = {
+    'llama': tuple(s for s in WORKLOADS if s.startswith('llama-')),
+    'qwen': tuple(s for s in WORKLOADS if s.startswith('qwen')),
+    'mistral': tuple(s for s in WORKLOADS if s.startswith('mistral-')),
+    'whisper': ('whisper-large',),
+}
 CUDA_SOURCE = 'https://developer.nvidia.com/cuda/gpus'
 LEGACY_CUDA_SOURCE = 'https://developer.nvidia.com/cuda-legacy-gpus'
 AMD_SOURCE = 'https://rocm.docs.amd.com/en/latest/reference/gpu-specs.html'

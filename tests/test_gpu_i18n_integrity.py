@@ -87,3 +87,28 @@ def test_english_fallbacks_are_only_native_words_names_and_units():
             continue
         identical = {key for key, value in _load(lang).items() if value == english[key]}
         assert identical <= common | allowed[lang], (lang, identical - common - allowed[lang])
+
+
+def test_workload_fact_check_terms_and_developer_placeholders():
+    for lang in LANGS:
+        m=_load(lang)
+        for key in ('vendor_context','vendor_bf16','vendor_4bit','vendor_mistral'):
+            assert '{developer}' in m['workload_'+key], (lang,key)
+        assert '1024³' in m['workload_vendor_context']
+        note=m['workload_vendor_mistral']
+        assert all(v in note for v in ('32768','8192','1/4','20 GB','5 GB'))
+        labels=[m[f'workload_source_deepseek_qwen_{n}b'] for n in (7,14,32)]
+        assert len(set(labels+[m['workload_source_config']]))==4
+    zh=_load('zh-Hans');de=_load('de')
+    assert '4-bit 量化' in zh['workload_vendor_4bit']
+    assert '批量 1' in zh['workload_vendor_context'] and '批量大小' in zh['workload_vendor_mistral']
+    assert '四位' not in zh['workload_vendor_4bit']+zh['workload_vendor_mistral']
+    assert '{source}列出' in zh['workload_vendor_mistral']
+    assert '{source}は' in _load('ja')['workload_vendor_mistral']
+    assert 'Hidden-Size' in de['workload_exact_inputs'] and 'Normalisierungsschichten' in de['workload_exact_inputs']
+    assert re.search(r'\{context\} Tokens\b', de['workload_exact_inputs'])
+    assert not re.search(r'\bTokenss+\b', de['workload_exact_inputs'])
+    assert 'Go décimaux' in _load('fr')['workload_vendor_context']
+    for lang in ('fr','es','pt-BR'):
+        assert '4 bits' in _load(lang)['workload_vendor_4bit']
+    assert 'desses valores' in _load('pt-BR')['workload_vendor_mistral']

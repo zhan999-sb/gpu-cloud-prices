@@ -4,7 +4,7 @@ from html import unescape
 from pathlib import Path
 import re
 
-from .workload_specs import (WORKLOADS, SOURCES, GUIDE_LINKS, route, WORKLOAD_CAPACITY,
+from .workload_specs import (WORKLOADS, WORKLOAD_FAMILIES, SAME_ARCHITECTURE, SOURCES, GUIDE_LINKS, route, WORKLOAD_CAPACITY,
     GPU_SOFTWARE, VLLM_CUDA_MIN, VLLM_ROCM_TARGETS, PYTORCH_CUDA_TARGETS, PYTORCH_ARM_TARGETS,
     INSTANCE_VRAM_PROVIDERS, PYTORCH_ROCM_TARGETS, capacity_spec, gpu_software, screened_capacity, model_identity, PCIE_ONLY, REVIEWED_MODELS)
 from .providers.registry import PROVIDERS
@@ -44,11 +44,23 @@ def snapshot(facts):
             entries.append(('/models/'+name.replace('~','~0').replace('/','~1')+'/offers/'+str(i),r,capacity))
     answer={}
     for slug,s in WORKLOADS.items():
+        unquantized=unquantized_weights=quantized_weights=None
         if s['kind']=='estimate':
             weight=s['parameters']*(s['bits']/8)
+            if s['bits']==4:
+                unquantized=s['hidden']*s['vocab']
+                if not s['tie_word_embeddings']: unquantized*=2
+                unquantized_weights=2*unquantized/10**9
+                quantized_weights=(s['parameters']*10**9-unquantized)/2/10**9
+                weight=unquantized_weights+quantized_weights
             cache=(2*s['layers']*s['kv_heads']*s['head_dim']*s['kv_bytes']*s['context'])/10**9
             need=1.2*weight+cache
         else: weight=cache=None;need=s['required']
+        estimate=need;vendor_gb=None
+        if s.get('vendor_setting')==(s.get('context'),s.get('batch')):
+            peaks=[s['vendor_bf16'][0]] if s['bits']==16 else [s['vendor_gptq'][0],s['vendor_awq'][0]]
+            vendor_gb=max(peaks)*(2**30)/(10**9)
+            need=max(need,vendor_gb)
         candidates={'single':[],'multi':[],'memory_only':[]}
         for p,r,v in entries:
             supported=_support(r,s);n=r['gpu_count']
@@ -73,7 +85,8 @@ def snapshot(facts):
         cards.update((x['path'],x['offer']) for x in rows['memory_only'])
         cards.update(e for group in ('single','multi') for e in heads[group].values() if e)
         good={p:r for group in ('single','multi') for p,r,v in candidates[group]}
-        answer[slug]=dict(required=need,weights=weight,kv=cache,parameters=s.get('parameters'),bytes=s.get('bits',0)/8,
+        answer[slug]=dict(required=need,estimate=estimate,vendor_gb=vendor_gb,weights=weight,kv=cache,
+            unquantized_parameters=unquantized,unquantized_weights=unquantized_weights,quantized_weights=quantized_weights,parameters=s.get('parameters'),bytes=s.get('bits',0)/8,
             context=s.get('context'),rows=rows,heads=heads,models=sorted({r['gpu_model'] for p,r in selected}),
             selected=selected,cards=sorted(cards.items(),key=lambda e:_order(e,True)),
             count=len({(r['gpu_model'],r['price_type']) for p,r in selected}),offers=len(good),
@@ -99,11 +112,13 @@ def audit_entry(page,raw,tr,filename,errors):
     sections=re.findall(r'<section data-workload-entry="true">(.*?)</section>',raw,re.S)
     if len(sections)!=1:
         errors.append(filename+': missing workload entry point');return
-    expected=[tr.language.path(route(s)) for s in WORKLOADS]
+    expected=[tr.language.path(route(s)) for members in WORKLOAD_FAMILIES.values() for s in members]
     if [a.get('href') for tag,a in Tags(sections[0]).tags if tag=='a']!=expected:
         errors.append(filename+': workload entry links mismatch')
-    wanted=tr.text('workload_entry_title')+tr.text('workload_entry_intro')+''.join(tr.text('workload_'+s['key']+'_title') for s in WORKLOADS.values())
+    wanted=tr.text('workload_entry_title')+tr.text('workload_entry_intro')+''.join(tr.text('workload_family_'+family)+''.join(tr.text('workload_'+WORKLOADS[s]['key']+'_title') for s in members) for family,members in WORKLOAD_FAMILIES.items())
     if unescape(re.sub('<[^>]+>','',sections[0]))!=wanted: errors.append(filename+': workload entry labels mismatch')
+    if [a.get('data-workload-family') for tag,a in Tags(sections[0]).tags if 'data-workload-family' in a]!=list(WORKLOAD_FAMILIES):
+        errors.append(filename+': workload family grouping mismatch')
 
 
 def audit_page(page,raw,slug,data,facts,tr,origin,slugs,filename,errors):
@@ -120,14 +135,34 @@ def audit_page(page,raw,slug,data,facts,tr,origin,slugs,filename,errors):
     expected={}
     def text(key,**kw): expected['workload:'+key]=tr.text('workload_'+key,**kw)
     def metric(field):
-        fmt='decimal3' if field in ('kv','required') else 'number'
-        v=format(d[field],'.3f').rstrip('0').rstrip('.') if fmt=='decimal3' else format(d[field],'g')
+        fmt='text' if field=='unquantized_parameters' or field=='parameters' and 'parameter_count' in spec else 'decimal3' if field in ('kv','required','estimate','vendor_gb','unquantized_weights','quantized_weights') else 'number'
+        v=str(d[field]) if fmt=='text' else format(d[field],'.3f').rstrip('0').rstrip('.') if fmt=='decimal3' else format(d[field],'g')
         values.append((base+'/'+field,fmt,v));return v
     text('intro',model=spec['model']);text('basis');text('requirement')
     if spec['kind']=='estimate':
         # Same field occurs twice in the formula.
-        parameters=metric('parameters');byte=metric('bytes');weight=metric('weights');metric('weights');cache=metric('kv');context=metric('context');need=metric('required')
-        text('weight_rule',parameters=parameters,bytes=byte,weights=weight,kv=cache,memory=need,context=context)
+        parameters=metric('parameters');weight=metric('weights');metric('weights');cache=metric('kv');context=metric('context')
+        if spec['bits']==4:
+            text('weight_rule_4bit',parameters=parameters,vocab=spec['vocab'],hidden=spec['hidden'],
+                copies=1 if spec['tie_word_embeddings'] else 2,tied=str(spec['tie_word_embeddings']).lower(),
+                unquantized=metric('unquantized_parameters'),unquantized_weights=metric('unquantized_weights'),
+                quantized_weights=metric('quantized_weights'),weights=weight,kv=cache,context=context,memory=metric('estimate'))
+            text('weight_inputs',sources='; '.join(tr.text(SOURCES[s][0]) for s in spec['weight_input_sources']))
+            blocks=re.findall(r'<p data-search="workload:weight_inputs">(.*?)</p>',raw,re.S)
+            if len(blocks)!=1 or [a.get('href') for tag,a in Tags(blocks[0]).tags if tag=='a']!=[SOURCES[s][1] for s in spec['weight_input_sources']]:
+                errors.append(filename+': weight input links mismatch')
+            if slug.startswith('llama-'): text('rounded_parameters')
+            for fmt,source,size in spec.get('checkpoint_sizes',()):
+                key='checkpoint_'+fmt.lower()
+                text(key,source=tr.text(SOURCES[source][0]),size=size,memory=f'{size/1e9:.6f}')
+                blocks=re.findall(r'<p data-search="workload:'+key+r'">(.*?)</p>',raw,re.S)
+                if len(blocks)!=1 or [a.get('href') for tag,a in Tags(blocks[0]).tags if tag=='a']!=[SOURCES[source][1]]:
+                    errors.append(filename+': quantized weight index link mismatch')
+        else:
+            text('weight_rule',parameters=parameters,bytes=metric('bytes'),weights=weight,kv=cache,memory=metric('required'),context=context)
+        if 'parameter_count' in spec:
+            text('exact_inputs',parameters=spec['parameter_count'],hidden=spec['hidden'],intermediate=spec['intermediate'],
+                vocab=spec['vocab'],context=spec['context'],maximum=spec['max_context'])
         # Actual order follows the translated formula; pointer multiplicities
         # are checked below, and every value is resolved independently in SQL.
         text('weight_caveat')
@@ -135,6 +170,30 @@ def audit_page(page,raw,slug,data,facts,tr,origin,slugs,filename,errors):
         if spec['kv_per_1k'] is not None: text('kv_blog')
         if spec['parameters']==13: text('kv_llama2')
         text('architecture',heads=spec['heads'],kv_heads=spec['kv_heads'])
+        if spec.get('same_as'):
+            text('same_estimate',models='; '.join(SAME_ARCHITECTURE[s].split('/')[-1] for s in spec['same_as']))
+            alias_blocks=re.findall(r'<p data-search="workload:same_estimate">(.*?)</p>',raw,re.S)
+            if len(alias_blocks)!=1 or [a.get('href') for tag,a in Tags(alias_blocks[0]).tags if tag=='a']!=[SOURCES[s][1] for s in spec['same_as']]:
+                errors.append(filename+': same-architecture config links mismatch')
+        if 'vendor_bf16' in spec:
+            text('vendor_context',developer='Qwen',source=tr.text('workload_source_qwen_benchmark'),code=tr.text('workload_source_qwen_benchmark_code'))
+            vendor_blocks=re.findall(r'<p data-search="workload:vendor_context">(.*?)</p>',raw,re.S)
+            if len(vendor_blocks)!=1 or [a.get('href') for tag,a in Tags(vendor_blocks[0]).tags if tag=='a']!=[SOURCES[s][1] for s in ('qwen_benchmark','qwen_benchmark_code')]:
+                errors.append(filename+': vendor benchmark link mismatch')
+            if spec['bits']==16:
+                memory,n=spec['vendor_bf16'];text('vendor_bf16',developer='Qwen',memory=f'{memory:.2f}',gpus=n)
+            else:
+                memory,n=spec['vendor_gptq'];awq,awq_n=spec['vendor_awq']
+                text('vendor_4bit',developer='Qwen',memory=f'{memory:.2f}',gpus=n,awq=f'{awq:.2f}',awq_gpus=awq_n)
+            if d['vendor_gb'] is not None:
+                text('vendor_screen',estimate=metric('estimate'),vendor=metric('vendor_gb'),memory=metric('required'))
+                if n*80<d['required']: text('vendor_smaller',developer='Qwen',gpus=n)
+        if spec.get('vendor_overview'):
+            source=SOURCES[spec['vendor_overview']]
+            text('vendor_mistral',developer='Mistral AI',source=tr.text(source[0]))
+            blocks=re.findall(r'<p data-search="workload:vendor_mistral">(.*?)</p>',raw,re.S)
+            if len(blocks)!=1 or [a.get('href') for tag,a in Tags(blocks[0]).tags if tag=='a']!=[source[1]]:
+                errors.append(filename+': Mistral vendor overview link mismatch')
         if spec['bits']==4: text('quant_caveat')
         text('floor_llm')
     else: text('whisper_rule',memory=metric('required'));text('floor_whisper')
@@ -250,6 +309,7 @@ def audit_page(page,raw,slug,data,facts,tr,origin,slugs,filename,errors):
     # The cited AMD product name contains AI; only that exact official name is
     # allowed, rather than a blanket exception to the site's wording rule.
     visible=visible.replace('Ryzen AI MAX / AI 300','Ryzen')
+    visible=visible.replace('Mistral AI','Mistral')
     if re.search(r'\bAI\b',visible): errors.append(filename+': forbidden workload wording')
     if raw.count('<article data-workload="'+slug+'">')!=1: errors.append(filename+': visible workload article missing')
     return expected,title,description

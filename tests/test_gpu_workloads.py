@@ -11,7 +11,7 @@ from pipelines.gpu_prices.build_site import build_site, model_slugs
 from pipelines.gpu_prices.i18n import LANGUAGES, load_catalogs
 from pipelines.gpu_prices.schema import Offer
 from pipelines.gpu_prices.store import PriceStore
-from pipelines.gpu_prices.workload_specs import WORKLOADS, SOURCES, route, WORKLOAD_CAPACITY, GPU_SOFTWARE, VLLM_ROCM_TARGETS
+from pipelines.gpu_prices.workload_specs import WORKLOADS, WORKLOAD_FAMILIES, MODEL_CONFIGS, SAME_ARCHITECTURE, SOURCES, route, WORKLOAD_CAPACITY, GPU_SOFTWARE, VLLM_ROCM_TARGETS
 
 DAY='2026-11-13';STAMP=DAY+'T08:00:00Z';ORIGIN='https://gpu.example.test'
 SMALL='llama-3-1-8b-4bit';MEDIUM='llama-3-1-8b-fp16';LARGE='llama-3-1-70b-fp16'
@@ -57,10 +57,10 @@ def site(tmp_path_factory):
 
 def test_reviewed_rules_and_official_evidence():
     data=workloads.snapshot(data_for(population()))
-    assert {s:d['required'] for s,d in data.items()}==pytest.approx({
-        MEDIUM:20.273741824,SMALL:5.873741824,'llama-2-13b-fp16':34.5554432,
-        'llama-2-13b-4bit':11.1554432,LARGE:170.68435456,
-        'llama-3-1-70b-4bit':44.68435456,'whisper-large':10})
+    assert {s:d['required'] for s,d in data.items() if s.startswith('llama-') or s=='whisper-large'}==pytest.approx({
+        MEDIUM:20.273741824,SMALL:7.7649534976,'llama-2-13b-fp16':34.5554432,
+        'llama-2-13b-4bit':11.7452672,LARGE:170.68435456,
+        'llama-3-1-70b-4bit':48.4667779072,'whisper-large':10})
     assert WORKLOADS['llama-2-13b-fp16']['kv_heads']==40
     assert data['llama-2-13b-4bit']['kv']==pytest.approx(3.3554432)
     assert data[SMALL]['kv']==pytest.approx(1.073741824)
@@ -84,6 +84,230 @@ def test_locale_punctuation_and_reviewed_copy():
     assert catalogs['es'].messages['workload_entry_intro'].startswith('Define')
     assert all('Spot' not in value for key,value in catalogs['ko'].messages.items() if key.startswith('workload_'))
     assert 'provedor' in catalogs['pt-BR'].messages['workload_check_stock']
+
+
+# Reviewed official configs and BF16 index metadata, 2026-11-14. Each page
+# links its upstream card/config/index; these independent expected values keep
+# rounded marketing parameter counts out of arithmetic. No network in tests.
+@pytest.mark.parametrize('model,parameters,layers,heads,kv_heads,hidden,intermediate,vocab,weight_bytes,cache,fp16,fourbit',[
+    ('qwen2-5-7b',7615616512,28,28,4,3584,18944,152064,15231233024,.469762048,18.7472416768,7.0011225088),
+    ('qwen2-5-14b',14770033664,48,40,8,5120,13824,152064,29540067328,1.610612736,37.0586935296,13.2754765824),
+    ('qwen2-5-32b',32763876352,64,40,8,5120,27648,152064,65527752704,2.147483648,80.7807868928,24.6086531072),
+    ('qwen2-5-72b',72706203648,80,64,8,8192,29568,152064,145412407296,2.68435456,177.1792433152,50.7926265856),
+    ('mistral-7b-instruct-v0-3',7248023552,32,32,8,4096,14336,32768,14496047104,1.073741824,18.4689983488,5.905739776),
+])
+def test_exact_new_model_inputs_and_fixed_context(model,parameters,layers,heads,kv_heads,hidden,intermediate,vocab,weight_bytes,cache,fp16,fourbit):
+    d=workloads.snapshot({})
+    for precision,need in (('fp16',fp16),('4bit',fourbit)):
+        slug=model+'-'+precision;s=WORKLOADS[slug]
+        assert (s['parameter_count'],s['layers'],s['heads'],s['kv_heads'],s['head_dim'])==(parameters,layers,heads,kv_heads,128)
+        assert (s['hidden'],s['intermediate'],s['vocab'])==(hidden,intermediate,vocab)
+        assert s['max_context']==32768 and s['context']==8192 and s['batch']==1 and s['kv_bytes']==2
+        assert s['parameters']==parameters/1e9 and parameters*2==weight_bytes
+        # Reconstruct all trainable shapes, including Qwen's attention biases.
+        k=kv_heads*128
+        assert 2*vocab*hidden+layers*(2*hidden**2+2*hidden*k+3*hidden*intermediate+2*hidden+(hidden+2*k if model.startswith('qwen') else 0))+hidden==parameters
+        assert d[slug]['required']==pytest.approx(need,abs=1e-10)
+        assert d[slug]['kv']==pytest.approx(cache,abs=1e-12)
+        assert {model+'_'+x for x in ('card','config','index')}<=set(s['sources'])
+    assert d==workload_audit.snapshot({'models':{}})
+
+
+def test_qwen_7b_tensor_parallel_four_heads_excludes_eight_gpus():
+    rows=data_for([offer('RTX 3060 12GB','two',2,gpu_count=2,price_per_gpu_hour=1),
+                   offer('RTX 3060 8GB','four',3,gpu_count=4,price_per_gpu_hour=.75),
+                   offer('RTX 3060 8GB','eight',.01,gpu_count=8,price_per_gpu_hour=.00125)])
+    d=workloads.snapshot(rows)
+    assert {x['offer']['sku'] for x in d['qwen2-5-7b-fp16']['rows']['multi']}=={'two','four'}
+    assert not d['qwen2-5-7b-4bit']['rows']['multi']
+    assert d==workload_audit.snapshot({'models':rows})
+
+
+def test_new_boundaries_change_the_fit_and_preserve_cheapest_instance_meta():
+    rows=data_for([offer('A100 80GB','not-enough-for-qwen32',1),
+                   offer('H100 NVL 94GB','single',7),
+                   offer('L40S 48GB','tp',2,gpu_count=2,price_per_gpu_hour=1)])
+    d=workloads.snapshot(rows);q=d['qwen2-5-32b-fp16']
+    assert {x['offer']['sku'] for x in q['rows']['single']}=={'single'}
+    assert q['overall']['on_demand'][1]['sku']=='single'
+    assert q['heads']['multi']['on_demand'][1]['sku']=='tp'
+    assert 'from $2.00/hr' in workloads.description('qwen2-5-32b-fp16',q,load_catalogs()['en'],DAY)
+    assert d==workload_audit.snapshot({'models':rows})
+
+
+def test_families_cover_seventeen_pages_once_and_aliases_have_no_routes():
+    members=[s for group in WORKLOAD_FAMILIES.values() for s in group]
+    assert len(members)==len(set(members))==len(WORKLOADS)==17
+    assert set(members)==set(WORKLOADS)
+    assert [len(m) for m in WORKLOAD_FAMILIES.values()]==[6,8,2,1]
+    assert len(SAME_ARCHITECTURE)==3
+    assert not any('deepseek' in s for s in WORKLOADS)
+    for size in (7,14,32):
+        for precision in ('fp16','4bit'):
+            s=WORKLOADS[f'qwen2-5-{size}b-{precision}']
+            assert s['same_as']==(f'deepseek_qwen_{size}b',)
+            assert s['same_as'][0] in s['sources']
+    for tr in load_catalogs().values():
+        raw=workloads.entry_points(tr)
+        assert raw.count('data-workload-family=')==4
+        errors=[];workload_audit.audit_entry(Page(raw),raw,tr,'entries',errors)
+        assert errors==[]
+        damaged=raw.replace('data-workload-family="qwen"','data-workload-family="llama"')
+        workload_audit.audit_entry(Page(damaged),damaged,tr,'entries',errors)
+        assert errors
+
+
+def test_vendor_numbers_units_and_context_are_cited_and_screened(site):
+    _,out,_=site
+    expected={7:(15.38,6.52,6.39,1),14:(29.50,11.36,11.22,1),32:(63.72,21.09,20.81,1),72:(140,42.50,42.13,2)}
+    for size,(bf16,gptq,awq,n) in expected.items():
+        c=MODEL_CONFIGS[f'qwen2-5-{size}b']
+        assert c['vendor_bf16']==(bf16,n) and c['vendor_gptq']==(gptq,1) and c['vendor_awq']==(awq,1)
+    for tr in load_catalogs().values():
+        for slug,spec in WORKLOADS.items():
+            raw=(out/tr.language.prefix/(route(slug).lstrip('/')+'index.html')).read_text(encoding='utf-8')
+            p=Page(raw)
+            if 'parameter_count' in spec:
+                assert str(spec['parameter_count']) in p.search_values['workload:exact_inputs']
+                assert '8192' in p.search_values['workload:exact_inputs'] and '32768' in p.search_values['workload:exact_inputs']
+            if slug.startswith('qwen'):
+                assert '6144' in p.search_values['workload:vendor_context'] and '2048' in p.search_values['workload:vendor_context']
+                assert '1024³' in p.search_values['workload:vendor_context']
+                assert 'workload:vendor_screen' in p.search_values
+                assert ('workload:vendor_smaller' in p.search_values)==(spec['bits']==16 and size_from_slug(slug) in (32,72))
+                key='workload:vendor_bf16' if spec['bits']==16 else 'workload:vendor_4bit'
+                assert key in p.search_values
+                assert ('workload:same_estimate' in p.search_values)==(spec.get('same_as')!=())
+            else: assert 'workload:vendor_context' not in p.search_values
+            if slug.startswith('mistral-'):
+                value=p.search_values['workload:vendor_mistral']
+                assert all(v in value for v in ('20 GB','5 GB','BF16','FP4','32k','8192'))
+                assert 'mistral_overview' in spec['sources']
+
+
+def size_from_slug(slug):
+    return int(slug.split('-')[2][:-1])
+
+
+@pytest.mark.parametrize('slug,vocab,hidden,u',[
+    ('llama-3-1-8b-4bit',128256,4096,1050673152),
+    ('llama-2-13b-4bit',32000,5120,327680000),
+    ('llama-3-1-70b-4bit',128256,8192,2101346304),
+    ('qwen2-5-7b-4bit',152064,3584,1089994752),
+    ('qwen2-5-14b-4bit',152064,5120,1557135360),
+    ('qwen2-5-32b-4bit',152064,5120,1557135360),
+    ('qwen2-5-72b-4bit',152064,8192,2491416576),
+    ('mistral-7b-instruct-v0-3-4bit',32768,4096,268435456),
+])
+def test_official_unquantized_inputs_and_rendered_split(site,slug,vocab,hidden,u):
+    _,out,_=site;s=WORKLOADS[slug];d=workloads.snapshot({})[slug]
+    assert (s['vocab'],s['hidden'],s['tie_word_embeddings'])==(vocab,hidden,False)
+    assert d['unquantized_parameters']==u
+    assert d['unquantized_weights']==pytest.approx(u*2/1e9)
+    assert d['weights']>s['parameters']*.5
+    for tr in load_catalogs().values():
+        raw=(out/tr.language.prefix/(route(slug).lstrip('/')+'index.html')).read_text(encoding='utf-8')
+        p=Page(raw);split=p.search_values['workload:weight_rule_4bit']
+        assert str(u) in split and str(vocab) in split and str(hidden) in split
+        assert 'workload:weight_rule' not in p.search_values
+        assert 'workload:weight_inputs' in p.search_values
+        if slug.startswith('qwen'):
+            assert all('workload:checkpoint_'+fmt in p.search_values for fmt in ('awq','gptq'))
+        if slug.startswith('llama'):
+            assert 'workload:rounded_parameters' in p.search_values
+
+
+def test_tied_embeddings_are_counted_once(monkeypatch):
+    spec=dict(WORKLOADS[SMALL],tie_word_embeddings=True)
+    monkeypatch.setitem(WORKLOADS,SMALL,spec)
+    d=workloads.snapshot({})[SMALL]
+    assert d['unquantized_parameters']==525336576
+    assert d['weights']==pytest.approx(4.788004864)
+    assert d==workload_audit.snapshot({'models':{}})[SMALL]
+
+
+def test_corrected_live_llama_and_qwen_capacity_boundaries():
+    models=data_for([offer('RTX 3050 6GB','six'),offer('RTX 4060 8GB','seven',vram_raw='7 GB'),
+        offer('RTX 3060 8GB','eight'),offer('RTX 2080 Ti 11GB','eleven'),
+        offer('RTX 3060 12GB','twelve'),offer('RTX A4000 16GB','sixteen'),
+        offer('L40S 48GB','fortyeight'),offer('A100 80GB','eighty')])
+    d=workloads.snapshot(models)
+    assert {x['offer']['sku'] for x in d[SMALL]['rows']['single']}=={'eight','eleven','twelve','sixteen','fortyeight','eighty'}
+    assert {x['offer']['sku'] for x in d['llama-2-13b-4bit']['rows']['single']}=={'twelve','sixteen','fortyeight','eighty'}
+    assert {x['offer']['sku'] for x in d['llama-3-1-70b-4bit']['rows']['single']}=={'eighty'}
+    assert 'seven' not in {x['offer']['sku'] for x in d['qwen2-5-7b-4bit']['rows']['single']}
+    assert 'twelve' not in {x['offer']['sku'] for x in d['qwen2-5-14b-4bit']['rows']['single']}
+    assert d==workload_audit.snapshot({'models':models})
+
+
+def test_vendor_peak_vetoes_single_and_tp_after_gib_conversion(monkeypatch):
+    # Exercise the vendor-dominant branch: today's corrected analytical
+    # estimates happen to exceed every cited peak, so fixtures alone miss it.
+    slug='qwen2-5-7b-4bit'
+    monkeypatch.setitem(WORKLOADS,slug,dict(WORKLOADS[slug],vendor_gptq=(8,1),vendor_awq=(9,1)))
+    models=data_for([offer('RTX 3060 8GB','eight'),offer('RTX 3080 10GB','ten'),
+        offer('RTX 3050 6GB','tp',gpu_count=2),offer('RTX 4060 8GB','short-tp',gpu_count=2,vram_raw='4 GB')])
+    d=workloads.snapshot(models);q=d[slug]
+    assert q['vendor_gb']==pytest.approx(9.663676416)
+    assert q['required']==q['vendor_gb']>q['estimate']
+    assert {x['offer']['sku'] for x in q['rows']['single']}=={'ten'}
+    assert {x['offer']['sku'] for x in q['rows']['multi']}=={'tp'}
+    assert d==workload_audit.snapshot({'models':models})
+
+
+def test_no_fit_is_below_the_cited_vendor_peak():
+    models=data_for(population()+[offer('RTX 3050 6GB','six'),offer('RTX 2080 Ti 11GB','eleven'),offer('RTX 3060 12GB','twelve')])
+    for slug,q in workloads.snapshot(models).items():
+        if q['vendor_gb'] is None: continue
+        for section in ('single','memory_only','multi'):
+            for x in q['rows'][section]:
+                capacity=x['vram']*(x['offer']['gpu_count'] if section=='multi' else 1)
+                assert capacity>=q['vendor_gb']
+                assert capacity>=q['estimate']
+
+
+def test_vendor_screen_requires_matching_context_and_batch(monkeypatch):
+    slug='qwen2-5-7b-4bit'
+    monkeypatch.setitem(WORKLOADS,slug,dict(WORKLOADS[slug],context=4096))
+    d=workloads.snapshot({})
+    assert d[slug]['vendor_gb'] is None and d[slug]['required']==d[slug]['estimate']
+    assert d==workload_audit.snapshot({'models':{}})
+
+
+@pytest.mark.parametrize('old,new',[
+    ('1089994752</span>','1</span>'),
+    ('5570747392 bytes','1 bytes'),
+    ('href="'+SOURCES['qwen2-5-7b_awq_index'][1]+'"','href="https://example.test/fake-index"'),
+    ('Governing capacity screen: max','Governing capacity screen: min'),
+])
+def test_independent_audit_rejects_split_index_and_vendor_screen_corruption(site,old,new):
+    store,out,_=site;slug='qwen2-5-7b-4bit';filename=route(slug).lstrip('/')+'index.html'
+    raw=(out/filename).read_text(encoding='utf-8');changed=raw.replace(old,new,1)
+    assert changed!=raw
+    facts=_snapshot(store.connection,DAY,STAMP);errors=[]
+    workload_audit.audit_page(Page(changed),changed,slug,workload_audit.snapshot(facts),facts,
+        load_catalogs()['en'],ORIGIN,model_slugs(facts['models']),filename,errors)
+    assert errors
+
+
+@pytest.mark.parametrize('damage',['exact-input','vendor-number','vendor-link','alias-label','alias-link','mistral-number','mistral-link'])
+def test_independent_audit_rejects_new_model_evidence_corruption(site,damage):
+    store,out,_=site;slug='mistral-7b-instruct-v0-3-fp16' if damage.startswith('mistral-') else 'qwen2-5-7b-fp16';filename=route(slug).lstrip('/')+'index.html'
+    raw=(out/filename).read_text(encoding='utf-8')
+    old,new={
+        'exact-input':('7615616512 parameters','7000000000 parameters'),
+        'vendor-number':('15.38 GiB','1.00 GiB'),
+        'vendor-link':('href="'+SOURCES['qwen_benchmark'][1]+'"','href="https://example.test/fake"'),
+        'alias-label':('DeepSeek-R1-Distill-Qwen-7B</a>','DeepSeek-R1-Distill-Qwen-14B</a>'),
+        'alias-link':('href="'+SOURCES['deepseek_qwen_7b'][1]+'"','href="https://example.test/fake"'),
+        'mistral-number':('20 GB at BF16','2 GB at BF16'),
+        'mistral-link':('href="'+SOURCES['mistral_overview'][1]+'"','href="https://example.test/fake"'),
+    }[damage]
+    changed=raw.replace(old,new,1);assert changed!=raw
+    facts=_snapshot(store.connection,DAY,STAMP);errors=[]
+    workload_audit.audit_page(Page(changed),changed,slug,workload_audit.snapshot(facts),facts,
+        load_catalogs()['en'],ORIGIN,model_slugs(facts['models']),filename,errors)
+    assert errors,damage
 
 
 @pytest.mark.parametrize('slug',[SMALL,MEDIUM,LARGE,'whisper-large'])
@@ -187,13 +411,13 @@ def test_duplicate_gate_checks_each_section_and_marks_looser():
 
 def test_all_locales_metadata_sources_links_breadcrumbs_and_sitemaps(site):
     store,out,result=site;catalogs=load_catalogs();data=workload_audit.snapshot(_snapshot(store.connection,DAY,STAMP))
-    assert result['audit']['workload_pages']==56
+    assert result['audit']['workload_pages']==17*8
     indexed={n.text for n in ET.parse(out/'sitemap.xml').findall('.//{*}loc')}
     for lang in LANGUAGES:
         localized={n.text for n in ET.parse(out/('sitemap-'+lang.code+'.xml')).findall('.//{*}loc')}
         linking=[Page((out/lang.prefix/path).read_text(encoding='utf-8')) for path in ('index.html','guides/index.html','guides/choose-gpu-cloud-llm-inference/index.html')]
         related_raw=(out/lang.prefix/'guides/choose-gpu-cloud-llm-inference/index.html').read_text(encoding='utf-8')
-        related=re.findall(r'<h2 data-search="guide:related">.*?</h2><ul data-workload-related="true">(.*?)</ul>',related_raw,re.S)
+        related=re.findall(r'<h2 data-search="guide:related">.*?</h2><ul data-workload-related="true">(.*?)</ul><p>',related_raw,re.S)
         assert len(related)==1
         assert {lang.path(route(s)) for s in WORKLOADS}<={a.get('href') for tag,a in Page(related[0]).links if tag=='a'}
         descriptions=[];titles=[]
@@ -214,7 +438,7 @@ def test_all_locales_metadata_sources_links_breadcrumbs_and_sitemaps(site):
             assert all(lang.path(route(slug)) in {a.get('href') for tag,a in p.links if tag=='a'} for p in linking)
             assert len([a for tag,a in page.links if tag=='link' and a.get('hreflang')])==9
             assert '\ufffd' not in raw and '??' not in raw
-        assert len(set(titles))==len(set(descriptions))==7
+        assert len(set(titles))==len(set(descriptions))==17
     english=(out/(route(SMALL).lstrip('/')+'index.html')).read_text(encoding='utf-8')
     assert 'Arm (aarch64) host' in english and 'non-CUDA' in english and 'below floor' in english
     assert 'one GPU’s memory passes, but this offer is sold only as an instance with 4 GPUs' in english
@@ -251,7 +475,8 @@ def test_workloads_receive_strict_multilingual_html_checks(site):
 def test_common_cheaper_gpu_wins_and_unreviewed_models_are_disclosed():
     rows=data_for([offer('A100 80GB',rate=1),offer('RTX A6000 48GB',rate=.3),offer('Future GPU 900GB',rate=.001)])
     d=workloads.snapshot(rows)
-    assert d['llama-3-1-70b-4bit']['overall']['on_demand'][1]['gpu_model']=='RTX A6000 48GB'
+    assert d['llama-2-13b-fp16']['overall']['on_demand'][1]['gpu_model']=='RTX A6000 48GB'
+    assert d['llama-3-1-70b-4bit']['overall']['on_demand'][1]['gpu_model']=='A100 80GB'
     assert d[SMALL]['unreviewed']==['Future GPU']
     assert d==workload_audit.snapshot({'models':rows})
 
@@ -338,8 +563,9 @@ def test_multi_requires_insufficient_per_gpu_memory_and_overall_prefers_single_g
 def test_primary_sibling_cluster_has_one_strictest_reference_and_same_floor():
     rows=data_for([offer(model,sku=model,gpu_count=4) for model in ('T4 16GB','A30 24GB','A100 40GB','L40S 48GB','H200 141GB','MI300X 192GB')])
     d=workloads.snapshot(rows)
-    assert d[SMALL]['siblings']==[dict(slug='llama-2-13b-4bit',sections=['single'])]
-    for slug in ('llama-2-13b-4bit',MEDIUM,'llama-2-13b-fp16','llama-3-1-70b-4bit',LARGE,'whisper-large'): assert d[slug]['indexable']
+    assert d[SMALL]['siblings']==[dict(slug='qwen2-5-14b-4bit',sections=['single'])]
+    for slug in (MEDIUM,'qwen2-5-14b-4bit','qwen2-5-32b-fp16','qwen2-5-14b-fp16','qwen2-5-72b-fp16','whisper-large'): assert d[slug]['indexable']
+    for slug in ('llama-2-13b-4bit','qwen2-5-32b-4bit','qwen2-5-72b-4bit','llama-2-13b-fp16','llama-3-1-70b-4bit',LARGE): assert not d[slug]['indexable']
     for page in d.values():
         for s in page['siblings']: assert not d[s['slug']]['siblings']
     assert d==workload_audit.snapshot({'models':rows})
@@ -382,7 +608,7 @@ def test_independent_audit_rejects_corruption(site,damage):
     store,out,result=site;slug=SMALL;filename=route(slug).lstrip('/')+'index.html'
     raw=(out/filename).read_text(encoding='utf-8')
     changes={
-        'rule':('data-format="decimal3">5.874<','data-format="decimal3">5.875<'),
+        'rule':('data-format="decimal3">7.765<','data-format="decimal3">7.766<'),
         'price':('data-format="money">$0.400<','data-format="money">$0.001<'),
         'count':('/count" data-format="number">','/count" data-format="number">9'),
         'capacity':('/vram" data-format="number">16<','/vram" data-format="number">14<'),
