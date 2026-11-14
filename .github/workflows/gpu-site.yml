@@ -33,7 +33,7 @@ jobs:
   publish:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 75
     permissions:
       contents: write
     steps:
@@ -72,6 +72,9 @@ jobs:
           restore-keys: gpu-deploy-main-
 
       - name: Run offline pipeline tests
+        # Code only changes on push/manual runs (also covered by GPU PR checks). Scheduled
+        # runs reuse already-tested code and still pass the build audit before deploying.
+        if: github.event_name != 'schedule'
         run: |
           mkdir -p ci/runtime
           python -m pytest ci/tests tests/test_gpu_*.py -q -p no:cacheprovider --basetemp ci/runtime/pipeline-tests --junitxml ci/reports/pipeline-tests.xml

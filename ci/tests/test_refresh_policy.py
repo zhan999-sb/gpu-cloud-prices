@@ -281,6 +281,9 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(production.count(
             "if: success() && (steps.refresh.outputs.build == 'true' || github.event_name != 'schedule')"), 2)
         self.assertNotIn("if: success() && steps.refresh.outputs.build == 'true'\n", production)
+        # The offline test suite runs on push/manual runs only; scheduled runs reuse tested code.
+        tests_step = production.split('- name: Run offline pipeline tests', 1)[1].split('- name:', 1)[0]
+        self.assertIn("if: github.event_name != 'schedule'", tests_step)
         self.assertIn('ci.refresh_policy prepare-save', production)
         self.assertIn('actions/cache/save@', production)
 
