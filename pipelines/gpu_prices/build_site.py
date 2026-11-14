@@ -23,7 +23,8 @@ from .monthly import monthly_quotes
 from .providers.registry import PROVIDERS
 from .partners import surflare
 from .models import category, popular_rank, headline_order, POPULAR, CATEGORIES, model_family
-from . import search, audience, guides, reports
+from . import search, audience, guides, reports, workloads
+from .workload_specs import WORKLOADS, route as workload_route
 from .guide_specs import GUIDES, reference_rows
 from .search_specs import PAIRS, REFERENCES, SPECS
 
@@ -64,7 +65,7 @@ def model_slugs(models) -> dict[str, str]:
     model's unambiguous URL (e.g. 'GPU 2' alongside two variants of 'GPU').
     """
     ordered = sorted(set(models), key=lambda model: (model.casefold(), model))
-    reserved = {"reports", "guides", "data", "embed", "feed", "latest", "index", "methodology", "404", "robots", "sitemap", "providers", "compare", "social"} | {lang.prefix for lang in LANGUAGES if lang.prefix}
+    reserved = {"workloads", "reports", "guides", "data", "embed", "feed", "latest", "index", "methodology", "404", "robots", "sitemap", "providers", "compare", "social"} | {lang.prefix for lang in LANGUAGES if lang.prefix}
     natural = {model_slug(model) for model in ordered}
     used, result = set(reserved), {}
     for model in ordered:
@@ -145,7 +146,7 @@ def _partner(tr, *, compact=False):
             + '" target="_blank" rel="sponsored nofollow noopener">'
             + escape(partner['label']) + '</a>')
     if compact:
-        return ('<p class="partner-footer">' + tr.html('partner_heading') + ': ' + link
+        return ('<p class="partner-footer">' + tr.html('partner_heading')+tr.label_separator + link
                 + ' <span>' + tr.html('partner_footer', code=partner['promo_code']) + '</span></p>')
     return ('<aside class="partner-card" aria-labelledby="partner-heading"><h2 id="partner-heading">'
             + tr.html('partner_heading') + '</h2><p>' + link + '</p><p class="partner-disclosure">'
@@ -198,6 +199,8 @@ def _stat(path, value, fmt="money", tag="span"):
         formatted = value[:10]
     elif fmt == 'clock':
         formatted = parse_utc(value).strftime('%H:%M UTC')
+    elif fmt == 'decimal3':
+        formatted = f'{value:.3f}'.rstrip('0').rstrip('.')
     elif fmt == 'vram':
         match = re.search(r'\b\d+(?:\.\d+)?\s*(?:GB|GiB)\b', value, re.I)
         formatted = match.group() if match else '—'
@@ -293,12 +296,12 @@ def _cell(value, cls=""):
 
 
 def _original(row, path, tr):
-    result = '<br/><small>' + tr.html('billing_unit') + ': ' + tr.html('billing_' + row['billing_unit'].replace('-', '_')) + '</small>'
+    result = '<br/><small>' + tr.html('billing_unit')+tr.label_separator + tr.html('billing_' + row['billing_unit'].replace('-', '_')) + '</small>'
     if row['minimum_billing_seconds'] is not None:
-        result += '<br/><small>'+tr.html('minimum_billing')+': '+_stat(path+'/minimum_billing_seconds',row['minimum_billing_seconds'],'number')+'</small>'
+        result += '<br/><small>'+tr.html('minimum_billing')+tr.label_separator+_stat(path+'/minimum_billing_seconds',row['minimum_billing_seconds'],'number')+'</small>'
     if row['original_currency'] and row['original_currency'] != row['currency']:
-        result += '<br/><small>' + tr.html('original_hourly') + ': ' + escape(row['original_currency']) + ' ' + _stat(path+'/original_price',row['original_price'],'number')
-        result += ' · ' + tr.html('fx_rate_label') + ': ' + _stat(path+'/fx_rate',row['fx_rate'],'number')
+        result += '<br/><small>' + tr.html('original_hourly')+tr.label_separator + escape(row['original_currency']) + ' ' + _stat(path+'/original_price',row['original_price'],'number')
+        result += ' · ' + tr.html('fx_rate_label')+tr.label_separator + _stat(path+'/fx_rate',row['fx_rate'],'number')
         result += ' · <a href="'+escape(row['fx_source'],quote=True)+'">ECB</a> ' + _stat(path+'/fx_date',row['fx_date'],'text') + '</small>'
     for key in ('cpu_raw','ram_raw','vram_raw'):
         if row.get(key):
@@ -405,8 +408,8 @@ def _offer_card(row, path, tr, *, group='offers', model_url=None, drop_badge='')
     if o['is_from_price']:body+=_badge('from_price',tr)
     if fractional:body+=_badge('fractional',tr)
     hardware = []
-    if o['vcpu'] is not None:hardware.append(tr.html('vcpu')+': '+_stat(path+'/vcpu',o['vcpu'],'number'))
-    if o['ram_gb'] is not None:hardware.append(tr.html('ram')+': '+_stat(path+'/ram_gb',o['ram_gb'],'number'))
+    if o['vcpu'] is not None:hardware.append(tr.html('vcpu')+tr.label_separator+_stat(path+'/vcpu',o['vcpu'],'number'))
+    if o['ram_gb'] is not None:hardware.append(tr.html('ram')+tr.label_separator+_stat(path+'/ram_gb',o['ram_gb'],'number'))
     body+='</div>' + ('<p class="hardware">'+' · '.join(hardware)+'</p>' if hardware else '')+'</div><div class="offer-location"><p class="offer-region">'+escape(o['region'] or tr.text('unknown_region'))+'</p>'
     if o['provider']=='clore':body+='<p class="marketplace-note">'+tr.html('clore_price_note')+'</p>'
     body+='</div></div>'
@@ -415,25 +418,25 @@ def _offer_card(row, path, tr, *, group='offers', model_url=None, drop_badge='')
     body+='<p class="offer-meta"><span class="price-unit">'+tr.html('scope_gpu_component' if o['price_scope']=='gpu_component' else 'instance_hour')+'</span> · <span class="checked">'+tr.rich('checked_at',time='<time datetime="'+escape(o['collected_at'],quote=True)+'">'+_stat(path+'/collected_at',o['collected_at'],'clock')+'</time>')+'</span></p>'
     if o['price_scope']=='gpu_component':body+='<p class="component-note">'+tr.html('gpu_component_note')+'</p>'
     if o['original_currency'] and o['original_currency'] != o['currency']:
-        body+='<p class="native-price">'+tr.html('original_hourly')+': '+escape(o['original_currency'])+' '+_stat(path+'/original_price',o['original_price'],'number')+'/hr · '+tr.html('scope_'+o['price_scope'])+'</p>'
+        body+='<p class="native-price">'+tr.html('original_hourly')+tr.label_separator+escape(o['original_currency'])+' '+_stat(path+'/original_price',o['original_price'],'number')+'/hr · '+tr.html('scope_'+o['price_scope'])+'</p>'
     if o['currency'] != 'USD':body+='<p class="unit">'+tr.html('no_usd_conversion')+'</p>'
-    body += '<p class="minimum-instance">' + tr.html('seo_minimum_instance') + ': '
+    body += '<p class="minimum-instance">' + tr.html('seo_minimum_instance')+tr.label_separator
     if o['price_scope']=='gpu_component' or (o['price_scope']=='per_gpu' and o['gpu_count'] is None):
         body += tr.html('seo_instance_unknown')
     else:
         body += escape(o['currency'])+' '+_stat(path,o,'instance-money' if o['currency']=='USD' else 'instance-number')+'/hr'
         if o['minimum_billing_seconds'] is not None:
-            body += ' · '+tr.html('seo_billing_floor')+': '+escape(o['currency'])+' '+_stat(path,o,'minimum-charge-money' if o['currency']=='USD' else 'minimum-charge-number')+' / '+_stat(path+'/minimum_billing_seconds',o['minimum_billing_seconds'],'number')+' '+tr.html('seo_seconds')
+            body += ' · '+tr.html('seo_billing_floor')+tr.label_separator+escape(o['currency'])+' '+_stat(path,o,'minimum-charge-money' if o['currency']=='USD' else 'minimum-charge-number')+' / '+_stat(path+'/minimum_billing_seconds',o['minimum_billing_seconds'],'number')+' '+tr.html('seo_seconds')
         else:
             body += ' · '+tr.html('seo_billing_unknown')
     body += '</p>'
     body+='</div>'
     body+='<div class="offer-action">'+_outbound(o['provider'],o['sku'],o['region'],o['price_type'],o['gpu_model'],tr)
     if model_url:body+='<a class="model-link" href="'+model_url+'">'+tr.html('see_offers')+'</a>'
-    body+='<details class="offer-details"><summary>'+tr.html('offer_details_short')+'</summary><p>'+tr.html('sku')+': '+_stat(path+'/sku',o['sku'],'text')+' · '+tr.html('availability')+': '+tr.html(o['availability'])+' · '+_badge(_tier_key(o['tier']),tr)+'</p>'
+    body+='<details class="offer-details"><summary>'+tr.html('offer_details_short')+'</summary><p>'+tr.html('sku')+tr.label_separator+_stat(path+'/sku',o['sku'],'text')+' · '+tr.html('availability')+tr.label_separator+tr.html(o['availability'])+' · '+_badge(_tier_key(o['tier']),tr)+'</p>'
     for field, label in (('gpu_model_raw','reported_model'),('vram_raw','reported_vram')):
-        if o.get(field):body+='<p>'+tr.html(label)+': '+_stat(path+'/'+field,o[field],'text')+'</p>'
-    body+='<p>'+tr.html('sku_vm_hour')+': '+escape(o['currency'])+' '+_stat(path+'/price_per_hour',o['price_per_hour'],'money' if o['currency']=='USD' else 'number')+'/hr · '+tr.html('scope_'+o['price_scope'])+_original(o,path,tr)+'</p>'
+        if o.get(field):body+='<p>'+tr.html(label)+tr.label_separator+_stat(path+'/'+field,o[field],'text')+'</p>'
+    body+='<p>'+tr.html('sku_vm_hour')+tr.label_separator+escape(o['currency'])+' '+_stat(path+'/price_per_hour',o['price_per_hour'],'money' if o['currency']=='USD' else 'number')+'/hr · '+tr.html('scope_'+o['price_scope'])+_original(o,path,tr)+'</p>'
     if fractional:
         share=__import__('fractions').Fraction(min(v for v in (o['gpu_count'],o['gpu_fraction']) if v is not None)).limit_denominator(12)
         body+='<p>'+tr.html('fraction_note',share=str(share))+'</p>'
@@ -569,7 +572,7 @@ def _summary_strip(entries, tr):
     return body+'</aside>'
 
 
-def _home(offers, models, slugs, today, coverage, tr, model_data, monthly=()):
+def _home(offers, models, slugs, today, coverage, tr, model_data, monthly=(), *, include_workloads=True):
     selected = [o for o in offers if eligible(o)]
     active = sorted({o.gpu_model for o in selected})
     body = '<section class="hero"><h1>' + tr.html("home_heading") + '</h1><p>' + tr.html("home_intro") + '</p></section>'
@@ -606,7 +609,7 @@ def _home(offers, models, slugs, today, coverage, tr, model_data, monthly=()):
         stats=model_data[m]['statistics'];base=_pointer('models',m,'statistics')
         summary.append('<tr>'+_cell(m)+''.join('<td>'+_value(base+'/cheapest/'+k,stats['cheapest'][k],tr)+' '+tr.html('gpu_hour')+'</td>' for k in ('on_demand','spot'))+'<td>'+_discount(stats,base,tr)+'</td></tr>')
     body+='<details class="comparison"><summary>'+tr.html('how_compare')+'</summary><p>'+tr.html('basis')+'</p><p>'+tr.html('maximum_def')+'</p>'+_table([tr.text(k) for k in ('gpu_model','cheapest_on_demand','cheapest_spot','spot_discount')],summary,tr.text('home_caption'))+coverage+'<p><a href="'+tr.language.path('/methodology')+'">'+tr.html('methodology')+'</a></p></details>'
-    body+='<section aria-labelledby="guides-heading"><h2 id="guides-heading"><a href="'+tr.language.path('/guides/')+'">'+tr.html('guide_index_title')+'</a></h2><p>'+tr.html('guide_index_intro')+'</p><ul>'+''.join('<li><a href="'+tr.language.path('/guides/'+slug+'/')+'">'+tr.html('guide_'+key+'_title')+'</a></li>' for slug,(key,_) in GUIDES.items())+'</ul></section>'
+    body+='<section aria-labelledby="guides-heading"><h2 id="guides-heading"><a href="'+tr.language.path('/guides/')+'">'+tr.html('guide_index_title')+'</a></h2><p>'+tr.html('guide_index_intro')+'</p><ul>'+''.join('<li><a href="'+tr.language.path('/guides/'+slug+'/')+'">'+tr.html('guide_'+key+'_title')+'</a></li>' for slug,(key,_) in GUIDES.items())+'</ul>'+ (workloads.entry_points(tr) if include_workloads else '')+'</section>'
     numbers=dict(count=tr.quantity('offer_count',len(selected)),models=tr.quantity('model_count',len(active)),regions=tr.quantity('region_count',len({o.region for o in selected})),date=today)
     return body,tr.text('home_title',**numbers),tr.text('home_description',**numbers)
 
@@ -744,7 +747,8 @@ def _page_file(path):
 
 
 def build_site(store: PriceStore, out: str | Path = DEFAULT_OUT, *, today: str | None = None,
-               built_at: str | None = None, site_base_url: str | None = None) -> dict:
+               built_at: str | None = None, site_base_url: str | None = None,
+               include_workloads: bool = True) -> dict:
     """One language-neutral snapshot, then localized HTML; no HTTP or sample data."""
     today = today or datetime.now(timezone.utc).date().isoformat()
     date.fromisoformat(today)
@@ -798,6 +802,7 @@ def build_site(store: PriceStore, out: str | Path = DEFAULT_OUT, *, today: str |
             artifact['latest_collection'] = max((r for r in store.provider_runs().values() if r['provider'] in {o.provider for o in history_rows}),key=lambda r:r['id'],default=None)
     index=audience.data_index(exports,origin,today,built)
     report_data=reports.snapshot(observed_rows,[o.to_dict() for o in offers],today,built)
+    workload_data=workloads.snapshot(model_data) if include_workloads else {}
     feed_items=audience.events({d['gpu_model']:d for d in exports.values()},observed_rows,today,built)
     feed_items=sorted(feed_items+reports.feed_events(report_data,today),key=lambda e:(-date.fromisoformat(e['day']).toordinal(),json.dumps(e,sort_keys=True)))[:50]
     last_updated = max((r['collected_at'] for r in observed_rows),default=None)
@@ -807,7 +812,7 @@ def build_site(store: PriceStore, out: str | Path = DEFAULT_OUT, *, today: str |
     for lang in LANGUAGES:
         tr = catalogs[lang.code]
         coverage = _coverage(run, tr)
-        body, title, description = _home(offers, models, slugs, today, coverage + _provider_coverage(provider_coverage, tr), tr, model_data, monthly)
+        body, title, description = _home(offers, models, slugs, today, coverage + _provider_coverage(provider_coverage, tr), tr, model_data, monthly, include_workloads=include_workloads)
         body+='<section><h2><a href="'+lang.path('/reports/')+'">'+tr.html('report_index_title')+'</a></h2><p><a data-report-latest="true" href="'+lang.path('/reports/'+reports.week(today)+'/')+'">'+tr.html('report_latest')+'</a></p></section>'
         website = {"@context": "https://schema.org", "@type": "WebSite", "name": tr.text("site_name"),
                    "url": origin + lang.path(), "description": description, "inLanguage": lang.code}
@@ -852,7 +857,8 @@ def build_site(store: PriceStore, out: str | Path = DEFAULT_OUT, *, today: str |
         guide_data = guides.snapshot(model_data, reference_rows(store.connection))
         for slug in ('', *GUIDES):
             route = '/guides/' + (slug+'/' if slug else '')
-            title,description,body,count = guides.render(slug, guide_data, slugs, tr, stat=_stat, table=_table, card=_offer_card)
+            title,description,body,count = guides.render(slug, guide_data, slugs, tr, stat=_stat, table=_table, card=_offer_card, include_workloads=include_workloads)
+            if include_workloads and not slug: body += workloads.entry_points(tr)
             updated = guide_data['updated']
             crumbs = [(tr.text('nav_home'), '/'), (tr.text('guide_index_title'), '/guides/')]
             if slug: crumbs.append((title, route))
@@ -860,6 +866,14 @@ def build_site(store: PriceStore, out: str | Path = DEFAULT_OUT, *, today: str |
             pages[_page_file(lang.path(route))] = _page(title,body,updated,built,origin=origin,route=route,tr=tr,
                 description=description,structured=structured,noindex=count<3,crumbs=crumbs)
             if count>=3: sitemap_entries[lang.path(route)]=(updated or built,route)
+        for slug,data in workload_data.items():
+            route=workload_route(slug)
+            title,description,body,count=workloads.render(slug,data,slugs,tr,today,stat=_stat,table=_table,card=_offer_card)
+            updated=data['updated']
+            pages[_page_file(lang.path(route))]=_page(title,body,updated,built,origin=origin,route=route,tr=tr,
+                description=description,structured=workloads.article(slug,title,description,updated,tr,origin),
+                noindex=not data['indexable'],crumbs=[(tr.text('nav_home'),'/'),(tr.text('guide_index_title'),'/guides/'),(title,route)])
+            if data['indexable']: sitemap_entries[lang.path(route)]=(updated or built,route)
         for key in (None,*report_data):
             route='/reports/'+(key+'/' if key else '')
             title,description,body,indexable=reports.render(key,report_data,slugs,tr,stat=_stat,table=_table)
@@ -944,9 +958,9 @@ def build_site(store: PriceStore, out: str | Path = DEFAULT_OUT, *, today: str |
         _write(output / filename, json.dumps(content, ensure_ascii=False, indent=2, allow_nan=False) + "\n")
     for filename, content in other.items():
         _write(output / filename, content)
-    _write(manifest, json.dumps({"generated_at": built, "files": sorted(expected), "model_slugs": slugs, "observation_day": today, "site_base_url": origin}, indent=2) + "\n")
+    _write(manifest, json.dumps({"generated_at": built, "files": sorted(expected), "model_slugs": slugs, "observation_day": today, "site_base_url": origin, "include_workloads": include_workloads}, indent=2) + "\n")
     from .audit import audit_site
-    audit = audit_site(store.connection, output)
+    audit = audit_site(store.connection, output, require_workloads=include_workloads)
     return {"audit": audit, "models": models, "offers_today": len(offers), "html_pages": len(pages), "html_pages_by_language": counts,
             "out": str(output), "site_base_url": origin, "placeholder_base_url": origin == DEFAULT_SITE_BASE_URL,
             "model_urls": [origin + '/' + slugs[model] + '/' for model in models],

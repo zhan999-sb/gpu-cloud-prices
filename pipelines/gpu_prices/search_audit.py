@@ -91,7 +91,7 @@ def _png(raw):
     return pixels
 
 
-def audit_search(facts, manifest, out, errors, *, parsed_main=None):
+def audit_search(facts, manifest, out, errors, *, parsed_main=None, require_workloads=True):
     from .audit import Page, _eligible, _rate, _dollars, _resolve, _compare, _allowed_literals, _audit_cards
     catalogs=load_catalogs();origin=manifest['site_base_url'];slugs=manifest['model_slugs']
     entries=_entries(facts);extra=set();routes={};indexed={};parsed={}
@@ -99,6 +99,12 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
     guide_data=guide_snapshot(facts,errors)
     from .report_audit import snapshot as report_snapshot, audit_page as audit_report_page, _week
     report_data=report_snapshot(facts)
+    from .workload_audit import snapshot as workload_snapshot, audit_page as audit_workload_page, audit_entry
+    from .workload_specs import WORKLOADS, route as workload_route
+    include_workloads=require_workloads
+    if require_workloads and manifest.get('include_workloads',True) is not True: errors.append('workload coverage required by audit policy')
+    if type(include_workloads) is not bool: errors.append('invalid workload build option')
+    workload_data=workload_snapshot(facts) if include_workloads else {}
     day=facts['date'];last=facts['last_updated'] or facts['built']
     from .schema import parse_utc
     tracked=sorted({r['provider'] for r in facts['all_rows'] if parse_utc(r['collected_at'])<=parse_utc(facts['built'])})
@@ -115,6 +121,8 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
         ready=report_data[key]['indexable'] if key else any(d['indexable'] for d in report_data.values())
         modified=report_data[key]['updated'] if key else max((d['updated'] for d in report_data.values() if d['updated']),default=None)
         routes['/reports/'+(key+'/' if key else '')]=('report',key,3 if ready else 0,modified or facts['built'])
+    for slug,d in workload_data.items():
+        routes[workload_route(slug)]=('workload',slug,d['count'] if d['indexable'] else 0,d['updated'] or facts['built'])
     for model,d in facts['models'].items():
         route='/'+slugs[model]+'/'
         routes[route]=('model',model,d['statistics']['offers'],d['last_updated'] or last)
@@ -137,10 +145,11 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
     extra_html=0;additional_values=0
     for lang in LANGUAGES:
         tr=catalogs[lang.code]
+        workload_descriptions=set();workload_titles=set()
         allowed=_allowed_literals(tr,facts)|set(SPECS)
         allowed.update(tr.text('compare_label',left=a,right=b) for a,b in PAIRS.values())
         for route,(kind,subject,count,modified) in routes.items():
-            filename=_file(route,lang);is_aux=kind in {'provider','comparison','continuation','data','guide','report'}
+            filename=_file(route,lang);is_aux=kind in {'provider','comparison','continuation','data','guide','report','workload'}
             if is_aux:extra.add(filename);extra_html+=1
             try:
                 if parsed_main and filename in parsed_main:raw,page=parsed_main[filename]
@@ -173,11 +182,19 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
                                  'data':['Dataset','BreadcrumbList'] if facts['exports'] else ['BreadcrumbList']}.get(kind,['BreadcrumbList']))
             if kind=='guide':expected_types=(['Article'] if subject else [])+['BreadcrumbList']
             if kind=='report':expected_types=(['Article'] if subject else [])+['BreadcrumbList']
+            if kind=='workload':expected_types=['Article','BreadcrumbList']
             if [d.get('@type') for d in page.structured]!=expected_types:
                 errors.append(filename+': unexpected JSON-LD types/count (A-only Dataset and visible FAQ required)')
+            if kind=='home' and include_workloads:audit_entry(page,raw,tr,filename,errors)
             if kind=='guide':
                 expected_search,title,description=audit_guide_page(page,raw,GUIDES[subject][0] if subject else 'index',subject,
-                    guide_data,facts,tr,origin,slugs,filename,errors)
+                    guide_data,facts,tr,origin,slugs,filename,errors,include_workloads=include_workloads)
+                if include_workloads and not subject:audit_entry(page,raw,tr,filename,errors)
+            elif kind=='workload':
+                expected_search,title,description=audit_workload_page(page,raw,subject,workload_data,facts,tr,origin,slugs,filename,errors)
+                if description in workload_descriptions or title in workload_titles:
+                    errors.append(filename+': duplicate workload title or description')
+                workload_descriptions.add(description);workload_titles.add(title)
             elif kind=='report':
                 expected_search,title,description=audit_report_page(page,raw,subject,report_data,facts,tr,origin,slugs,filename,errors)
             elif kind=='model':
@@ -257,10 +274,12 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
                 crumb_items=[(tr.text('nav_home'),'/'),(tr.text('guide_index_title'),'/guides/')]+([(title,route)] if subject else [])
             if kind=='report':
                 crumb_items=[(tr.text('nav_home'),'/'),(tr.text('report_index_title'),'/reports/')]+([(title,route)] if subject else [])
+            if kind=='workload':
+                crumb_items=[(tr.text('nav_home'),'/'),(tr.text('guide_index_title'),'/guides/'),(title,route)]
             expected_crumb={'@context':'https://schema.org','@type':'BreadcrumbList','inLanguage':lang.code,'url':url,'itemListElement':[{'@type':'ListItem','position':i+1,'name':label,'item':origin+lang.path(path)} for i,(label,path) in enumerate(crumb_items)]}
             crumbs=[d for d in page.structured if d.get('@type')=='BreadcrumbList']
             if crumbs!=[expected_crumb] or page.breadcrumbs!=[' / '.join(label for label,_ in crumb_items)]:errors.append(filename+': breadcrumb mismatch')
-            if is_aux and kind not in {'guide','report'}:
+            if is_aux and kind not in {'guide','report','workload'}:
                 if kind!='data' and any('data-growth' in a for _,a,_ in page.growth_nodes):errors.append(filename+': unexpected growth marker on auxiliary page')
                 if page.title!=tr.text('page_title',title=title,site_name=tr.text('site_name')):errors.append(filename+': auxiliary title mismatch')
                 for k,v in {'og:title':title,'twitter:title':title,'description':description,'og:description':description,'twitter:description':description}.items():
@@ -352,7 +371,7 @@ def audit_search(facts, manifest, out, errors, *, parsed_main=None):
         _compare(json.loads((out/'indexnow-manifest.json').read_text(encoding='utf-8')),
                  {'version':1,'origin':origin,'pages':expected_hashes},'IndexNow page hashes',errors)
     except (OSError,ValueError):errors.append('IndexNow key/manifest missing or invalid')
-    return extra,dict(extra_html_pages=extra_html,additional_values_checked=additional_values,indexed_pages=len(indexed),noindex_pages=len(parsed)-len(indexed),sitemap_urls=len(indexed),language_sitemaps=8,guide_pages=len(LANGUAGES)*(len(GUIDES)+1),report_pages=len(LANGUAGES)*(len(report_data)+1),indexable_reports=sum(d['indexable'] for d in report_data.values())*len(LANGUAGES))
+    return extra,dict(extra_html_pages=extra_html,additional_values_checked=additional_values,indexed_pages=len(indexed),noindex_pages=len(parsed)-len(indexed),sitemap_urls=len(indexed),language_sitemaps=8,guide_pages=len(LANGUAGES)*(len(GUIDES)+1),report_pages=len(LANGUAGES)*(len(report_data)+1),indexable_reports=sum(d['indexable'] for d in report_data.values())*len(LANGUAGES),workload_pages=len(LANGUAGES)*len(workload_data),indexable_workloads=sum(d['indexable'] for d in workload_data.values())*len(LANGUAGES))
 
 
 def _audit_image(pixels, model, data, errors, filename):

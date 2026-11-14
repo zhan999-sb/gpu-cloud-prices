@@ -86,7 +86,7 @@ def snapshot(facts, errors):
         updated=max((r['collected_at'] for _,r in rows),default=None))
 
 
-def audit_page(page, raw, key, slug, data, facts, tr, origin, slugs, filename, errors):
+def audit_page(page, raw, key, slug, data, facts, tr, origin, slugs, filename, errors, *, include_workloads=True):
     from .audit import _audit_cards, _allowed_literals, _resolve, _dollars, _rate
     title=tr.text('guide_'+key+'_title');description=tr.text('guide_'+key+'_intro')
     names=[key+'_intro','basis']
@@ -133,6 +133,13 @@ def audit_page(page, raw, key, slug, data, facts, tr, origin, slugs, filename, e
     expected_links={tr.language.path('/guides/'+s+'/') for s in GUIDES if s!=slug}
     expected_links.update(tr.language.path('/compare/'+s+'/') for s in PAIRS)
     expected_links.add(tr.language.path('/methodology'))
+    if include_workloads and slug=='choose-gpu-cloud-llm-inference':
+        from .workload_specs import WORKLOADS, route
+        expected_links.update(tr.language.path(route(s)) for s in WORKLOADS)
+        related=re.findall(r'<h2 data-search="guide:related">.*?</h2><ul data-workload-related="true">(.*?)</ul>',raw,re.S)
+        related_links=[tr.language.path('/guides/'+s+'/') for s in GUIDES if s!=slug]+[tr.language.path(route(s)) for s in WORKLOADS]
+        if len(related)!=1 or [a.get('href') for tag,a in Tags(related[0]).tags if tag=='a']!=related_links:
+            errors.append(filename+': workload links missing from guide Related list')
     source_urls=[SOURCES[s][1] for s in GUIDES[slug][1]] if slug else []
     expected_links.update(source_urls)
     unique={p:r for p,r in selected}

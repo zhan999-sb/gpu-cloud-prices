@@ -1,6 +1,7 @@
 """Offline only. Hand-written tiny fixtures model Microsoft's documented shape."""
 
 from dataclasses import replace
+from functools import partial
 from datetime import datetime, timezone
 from email.message import Message
 from html.parser import HTMLParser
@@ -27,6 +28,12 @@ from pipelines.gpu_prices.store import PriceStore
 from pipelines.gpu_prices.audit import AuditError, Page, audit_site, live_sample
 from pipelines.gpu_prices.links import link_for
 from pipelines.gpu_prices.regions import region_class
+from pipelines.gpu_prices.workload_specs import WORKLOADS, route as workload_route
+
+# These tests exercise model/provider/history pages; workload coverage is in
+# test_gpu_workloads.py, which uses the production default in every build.
+build_site = partial(build_site, include_workloads=False)
+audit_site = partial(audit_site, require_workloads=False)
 
 # Synthetic observations, never imported by production code or the live smoke run.
 ITEM = json.loads(r'''{
@@ -771,7 +778,11 @@ def test_catalog_keys_named_placeholders_and_utf8():
         for key, text in catalog.messages.items():
             assert placeholders(text) == placeholders(english[key]), (code, key)
             assert text.strip() and "\ufffd" not in text
-            assert "<" not in text and ">" not in text, (code, key)
+            # These two reviewed plain-text comparisons are escaped by rich()
+            # and html(); keep rejecting markup and every other angle bracket.
+            plain = text.replace('< 1.25', '') if key == 'workload_tight' else text
+            if key == 'workload_check_interconnect': plain = plain.replace('N > 1', 'N')
+            assert "<" not in plain and ">" not in plain, (code, key)
         if code != "en":
             for key in ("home_heading", "home_description", "model_title", "method_history", "not_found"):
                 assert catalog.messages[key] != english[key], (code, key)
@@ -825,6 +836,8 @@ def assert_multilingual_site(root, origin, models):
     routes |= {'/guides/'} | {'/guides/'+slug+'/' for slug in GUIDES}
     # These fixtures retain only dates in ISO week 46; both new routes are thin.
     routes |= {'/reports/', '/reports/2026-W46/'}
+    if json.loads((root/'gpu-prices-manifest.json').read_text(encoding='utf-8')).get('include_workloads', True):
+        routes |= {workload_route(slug) for slug in WORKLOADS}
     all_pages = {origin + lang.path(route): (lang, route) for lang in LANGUAGES for route in routes}
     assert len(list(root.rglob("*.html"))) == len(all_pages) + len(models) * len(LANGUAGES)
     parsed, metadata, contact_bytes = {}, {}, set()

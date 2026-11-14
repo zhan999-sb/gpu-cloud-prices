@@ -87,7 +87,7 @@ def snapshot(model_data, references):
                 updated=max((r['collected_at'] for _,r in entries), default=None))
 
 
-def render(slug, data, slugs, tr, *, stat, table, card):
+def render(slug, data, slugs, tr, *, stat, table, card, include_workloads=True):
     """Renderer helpers are injected to avoid a circular import."""
     key = GUIDES[slug][0] if slug else 'index'
     route = '/guides/' + (slug+'/' if slug else '')
@@ -117,7 +117,7 @@ def render(slug, data, slugs, tr, *, stat, table, card):
     prose(key+'_intro')
     prose('basis')
     if data['updated']:
-        body += '<p>'+tr.html('guide_observed')+': '+stat('/guides/updated',data['updated'],'date')+'</p>'
+        body += '<p>'+tr.html('guide_observed')+tr.label_separator+stat('/guides/updated',data['updated'],'date')+'</p>'
     if key=='index':
         body += '<ul>'+''.join('<li><a href="'+tr.language.path('/guides/'+s+'/')+'">'+tr.html('guide_'+k+'_title')+'</a><p>'+tr.html('guide_'+k+'_intro')+'</p></li>' for s,(k,_) in GUIDES.items())+'</ul>'
     elif key=='choose':
@@ -160,7 +160,11 @@ def render(slug, data, slugs, tr, *, stat, table, card):
         body += '<ul data-search="guide:source-list">'+''.join('<li><a href="'+escape(SOURCES[s][1],quote=True)+'">'+escape(SOURCES[s][0])+'</a></li>' for s in GUIDES[slug][1])+'</ul>'
     if data['counts'][key]<3:prose('thin')
     prose('related','h2')
-    body += '<ul>'+''.join('<li><a href="'+tr.language.path('/guides/'+s+'/')+'">'+tr.html('guide_'+k+'_title')+'</a></li>' for s,(k,_) in GUIDES.items() if s!=slug)+'</ul>'
+    workload_links=''
+    if include_workloads and slug=='choose-gpu-cloud-llm-inference':
+        from .workload_specs import WORKLOADS, route as workload_route
+        workload_links=''.join('<li><a href="'+tr.language.path(workload_route(s))+'">'+tr.html('workload_'+spec['key']+'_title')+'</a></li>' for s,spec in WORKLOADS.items())
+    body += '<ul'+(' data-workload-related="true"' if workload_links else '')+'>'+''.join('<li><a href="'+tr.language.path('/guides/'+s+'/')+'">'+tr.html('guide_'+k+'_title')+'</a></li>' for s,(k,_) in GUIDES.items() if s!=slug)+workload_links+'</ul>'
     body += '<p><a href="'+tr.language.path('/methodology')+'">'+tr.html('methodology')+'</a></p><ul>'
     body += ''.join('<li><a href="'+tr.language.path('/compare/'+s+'/')+'">'+tr.html('compare_label',left=a,right=b)+'</a></li>' for s,(a,b) in PAIRS.items())+'</ul></article>'
     return title, description, body, data['counts'][key]

@@ -294,7 +294,7 @@ class Page(HTMLParser):
             block=next((f[1]['data-price-block'] for f in reversed(self.stack) if 'data-price-block' in f[1]),None)
             if block is not None and self.card is None:self.price_block_headings.append([block,text])
         if kind=='summary' and any(f[1].get('class')=='faq' for f in self.stack):self.faq_questions.append(text)
-        if ('data-report' in a or 'data-guide' in a or 'data-stat' in a or 'data-search' in a or 'data-faq' in a or 'data-growth' in a or 'data-price-block' in a or 'data-mirror' in a or a.get('class')=='minimum-instance') and any('hidden' in attrs or attrs.get('aria-hidden')=='true' or re.search(r'(?:display:none|visibility:hidden)',re.sub(r'\s+','',attrs.get('style','')).lower()) for attrs in [a]+[f[1] for f in self.stack]):raise AuditError('Audited content must be visible')
+        if ('data-workload' in a or 'data-workload-entry' in a or 'data-report' in a or 'data-guide' in a or 'data-stat' in a or 'data-search' in a or 'data-faq' in a or 'data-growth' in a or 'data-price-block' in a or 'data-mirror' in a or a.get('class')=='minimum-instance') and any('hidden' in attrs or attrs.get('aria-hidden')=='true' or re.search(r'(?:display:none|visibility:hidden)',re.sub(r'\s+','',attrs.get('style','')).lower()) for attrs in [a]+[f[1] for f in self.stack]):raise AuditError('Audited content must be visible')
         if 'data-search' in a:
             key=a['data-search']
             if key in self.search_values:raise AuditError('Duplicate search content marker: '+key)
@@ -433,7 +433,7 @@ def _audit_summary(page, entries, tr, facts, filename, errors):
         errors.append(filename+': missing summary numeric audit marker')
 
 
-def _audit_cards(page, name, tr, facts, filename, errors, entries_override=None):
+def _audit_cards(page, name, tr, facts, filename, errors, entries_override=None, order_override=None):
     """Independently reconstruct card selection, scopes, labels and default order.
 
     The renderer is not an oracle: these identities and amounts come from SQL.
@@ -446,6 +446,7 @@ def _audit_cards(page, name, tr, facts, filename, errors, entries_override=None)
         entries.extend((stem+str(i),row) for i,row in enumerate(data['offers']))
     fractional=lambda r:_allocation(r)=='fractional'
     order=lambda item:(item[1]['currency']!='USD' or item[1]['price_scope']=='gpu_component' or _rate(item[1]) is None,item[1]['currency'],_rate(item[1]) if _rate(item[1]) is not None else item[1]['price_per_hour'],item[0])
+    if order_override is not None: order=order_override
     if entries_override is not None:entries=entries_override
     elif name in facts['models']:entries=sorted(entries,key=order)[:12]
     expected=[]
@@ -537,7 +538,7 @@ def _audit_cards(page, name, tr, facts, filename, errors, entries_override=None)
                         'per-gpu':(('' if row['currency']=='USD' else row['currency']+' ')+(_dollars(_rate(row)) if row['currency']=='USD' else format(_rate(row),'g'))+' '+tr.text('per_gpu_hour') if _rate(row) is not None else tr.text('unknown_gpu_rate')),
                         'checked':tr.text('checked_at',time=clock),
                         'price-unit':tr.text('scope_gpu_component' if row['price_scope']=='gpu_component' else 'instance_hour')}
-        minimum=tr.text('seo_minimum_instance')+': '
+        minimum=tr.text('seo_minimum_instance')+tr.label_separator
         if row['price_scope']=='gpu_component' or (row['price_scope']=='per_gpu' and row['gpu_count'] is None):
             minimum+=tr.text('seo_instance_unknown')
         else:
@@ -545,13 +546,13 @@ def _audit_cards(page, name, tr, facts, filename, errors, entries_override=None)
             if row['minimum_billing_seconds'] is None:minimum+=' · '+tr.text('seo_billing_unknown')
             else:
                 charge=instance*row['minimum_billing_seconds']/3600
-                minimum+=' · '+tr.text('seo_billing_floor')+': '+row['currency']+' '+(_dollars(charge) if row['currency']=='USD' else format(charge,'g'))+' / '+format(row['minimum_billing_seconds'],'g')+' '+tr.text('seo_seconds')
+                minimum+=' · '+tr.text('seo_billing_floor')+tr.label_separator+row['currency']+' '+(_dollars(charge) if row['currency']=='USD' else format(charge,'g'))+' / '+format(row['minimum_billing_seconds'],'g')+' '+tr.text('seo_seconds')
         expected_roles['minimum-instance']=minimum
         if row['original_currency'] and row['original_currency']!=row['currency']:
-            expected_roles['native-price']=tr.text('original_hourly')+': '+row['original_currency']+' '+format(row['original_price'],'g')+'/hr · '+tr.text('scope_'+row['price_scope'])
+            expected_roles['native-price']=tr.text('original_hourly')+tr.label_separator+row['original_currency']+' '+format(row['original_price'],'g')+'/hr · '+tr.text('scope_'+row['price_scope'])
         for role,value in expected_roles.items():
             if roles.get(role)!=value:errors.append(filename+': offer card '+role+' mismatch')
-        hardware=' · '.join(tr.text(label)+': '+format(row[field],'g') for field,label in (('vcpu','vcpu'),('ram_gb','ram')) if row[field] is not None)
+        hardware=' · '.join(tr.text(label)+tr.label_separator+format(row[field],'g') for field,label in (('vcpu','vcpu'),('ram_gb','ram')) if row[field] is not None)
         if roles.get('hardware','')!=hardware:errors.append(filename+': hardware must omit unknown fields')
         if a.get('data-list')=='cheapest':
             group='popular' if popular_rank(row['gpu_model'])<len(POPULAR) else category(row['gpu_model'])
@@ -584,18 +585,18 @@ def _audit_cards(page, name, tr, facts, filename, errors, entries_override=None)
         if not required<=present:errors.append(filename+': missing card price/freshness marker')
 
 
-def audit_site(connection_or_path, out):
+def audit_site(connection_or_path, out, *, require_workloads=True):
     """Raise AuditError on any mismatch; return a compact, reproducible report."""
     own = not isinstance(connection_or_path, sqlite3.Connection)
     conn = sqlite3.connect(Path(connection_or_path).resolve().as_uri() + "?mode=ro", uri=True) if own else connection_or_path
     try:
-        return _audit(conn, Path(out))
+        return _audit(conn, Path(out), require_workloads=require_workloads)
     finally:
         if own:
             conn.close()
 
 
-def _audit(conn, out):
+def _audit(conn, out, *, require_workloads=True):
     manifest = json.loads((out / "gpu-prices-manifest.json").read_text(encoding="utf-8"))
     facts = _snapshot(conn, manifest["observation_day"], manifest["generated_at"])
     errors, checked, html_pages, parsed_main = [], 0, 0, {}
@@ -846,7 +847,7 @@ def _audit(conn, out):
                     errors.append(filename + ": observation timestamp mismatch")
             html_pages += 1
     from .search_audit import audit_search
-    extra_files, seo_counts = audit_search(facts, manifest, out, errors, parsed_main=parsed_main)
+    extra_files, seo_counts = audit_search(facts, manifest, out, errors, parsed_main=parsed_main, require_workloads=require_workloads)
     expected_files.update(extra_files)
     html_pages+=seo_counts.pop('extra_html_pages')
     checked+=seo_counts.pop('additional_values_checked')

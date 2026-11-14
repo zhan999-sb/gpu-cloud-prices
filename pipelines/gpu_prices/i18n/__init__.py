@@ -49,6 +49,11 @@ class Catalog:
     language: Language
     messages: dict[str, str]
 
+    @property
+    def label_separator(self) -> str:
+        """Locale punctuation, not an English sentence or translation fallback."""
+        return {'fr': ' : ', 'zh-Hans': '：', 'ja': '：'}.get(self.language.code, ': ')
+
     def text(self, key: str, **values) -> str:
         return self.messages[key].format(**values)
 
