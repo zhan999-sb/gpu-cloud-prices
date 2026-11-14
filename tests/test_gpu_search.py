@@ -7,6 +7,8 @@ import struct
 import xml.etree.ElementTree as ET
 import zlib
 
+from functools import partial
+
 import pytest
 
 from pipelines.gpu_prices.audit import AuditError, Page, audit_site
@@ -14,6 +16,11 @@ from pipelines.gpu_prices.build_site import build_site, model_slugs
 from pipelines.gpu_prices.i18n import LANGUAGES, load_catalogs
 from pipelines.gpu_prices.schema import Offer
 from pipelines.gpu_prices.store import PriceStore
+
+# This module tests its feature in all eight languages. The complete workload
+# matrix and its independent audit remain in test_gpu_workloads.py.
+build_site = partial(build_site, include_workloads=False)
+audit_site = partial(audit_site, require_workloads=False)
 from pipelines.gpu_prices.search_specs import PAIRS
 
 DAY='2026-11-12'
@@ -118,7 +125,7 @@ def test_provider_comparison_tables_and_no_variant_inference(search_site):
 ])
 def test_independent_audit_rejects_search_corruption(search_site,tmp_path,damage):
     store,source,_=search_site
-    out=tmp_path/'site';shutil.copytree(source,out)
+    out=tmp_path/'site';shutil.copytree(source,out,copy_function=shutil.copy2)
     path=out/'h100-sxm-80gb/index.html'
     if damage in {'provider-count','provider-min'}:path=out/'providers/nebius/index.html'
     if damage in {'spec','spec-source'}:path=out/'compare/rtx-4090-vs-rtx-5090/index.html'

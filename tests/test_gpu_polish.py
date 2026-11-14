@@ -5,6 +5,8 @@ from pathlib import Path
 import re
 import urllib.request
 
+from functools import partial
+
 import pytest
 
 from pipelines.gpu_prices.audit import AuditError, Page, audit_site
@@ -15,6 +17,11 @@ from pipelines.gpu_prices.providers import clore
 from pipelines.gpu_prices.providers.page_collector import normalize
 from pipelines.gpu_prices.schema import Offer
 from pipelines.gpu_prices.store import PriceStore
+
+# This module tests its feature in all eight languages. The complete workload
+# matrix and its independent audit remain in test_gpu_workloads.py.
+build_site = partial(build_site, include_workloads=False)
+audit_site = partial(audit_site, require_workloads=False)
 
 STAMP = '2026-11-12T18:00:00Z'
 DAY = STAMP[:10]
@@ -174,8 +181,8 @@ def test_canonical_headlines_grouping_summary_and_raw_transparency(polished_site
 
 
 @pytest.mark.parametrize('damage', ['price','model','type','provider','region','offers','providers','clock','marker','remove','duplicate','legacy-open','wrong-group','raw-name'])
-def test_audit_rejects_polish_semantic_corruption(polished_site,damage):
-    db,directory=polished_site
+def test_audit_rejects_polish_semantic_corruption(polished_site,damage,gpu_site_copy):
+    db,directory=gpu_site_copy(polished_site)
     path=directory/'index.html';original=path.read_text(encoding='utf-8')
     strip=re.search(r'<aside class="summary-strip".*?</aside>',original).group()
     if damage in {'price','model','type','provider','region','offers','providers','clock','marker'}:

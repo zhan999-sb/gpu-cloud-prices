@@ -9,6 +9,8 @@ import traceback
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlsplit
 
+from functools import partial
+
 import pytest
 
 from pipelines.gpu_prices import http, run
@@ -20,6 +22,11 @@ from pipelines.gpu_prices.providers.registry import PROVIDERS
 from pipelines.gpu_prices.regions import eligible
 from pipelines.gpu_prices.schema import parse_utc
 from pipelines.gpu_prices.store import PriceStore
+
+# This module tests its feature in all eight languages. The complete workload
+# matrix and its independent audit remain in test_gpu_workloads.py.
+build_site = partial(build_site, include_workloads=False)
+audit_site = partial(audit_site, require_workloads=False)
 
 FIXTURES = Path(__file__).parent / 'fixtures/gcp'
 STAMP = '2026-11-13T12:00:00Z'

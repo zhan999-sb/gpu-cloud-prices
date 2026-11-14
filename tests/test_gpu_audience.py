@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
+from functools import partial
+
 import pytest
 
 from pipelines.gpu_prices import audience
@@ -13,6 +15,11 @@ from pipelines.gpu_prices.build_site import build_site, model_slugs
 from pipelines.gpu_prices.i18n import LANGUAGES, load_catalogs
 from pipelines.gpu_prices.schema import Offer
 from pipelines.gpu_prices.store import PriceStore
+
+# This module tests its feature in all eight languages. The complete workload
+# matrix and its independent audit remain in test_gpu_workloads.py.
+build_site = partial(build_site, include_workloads=False)
+audit_site = partial(audit_site, require_workloads=False)
 
 DAY='2026-11-12'
 STAMP=DAY+'T12:00:00Z'
@@ -148,8 +155,8 @@ def test_route_collisions_reserved_growth_paths():
     ('h100-sxm-80gb/index.html','width=&quot;360&quot;','width=&quot;999&quot;'),
     ('h100-sxm-80gb/index.html','<section data-growth="embed">','<section hidden data-growth="embed">'),
 ])
-def test_independent_audit_rejects_growth_corruption(growth_site,filename,old,new):
-    store,folder,_=growth_site;path=folder/filename
+def test_independent_audit_rejects_growth_corruption(growth_site,filename,old,new,gpu_site_copy):
+    store,folder,_=gpu_site_copy(growth_site);path=folder/filename
     original=path.read_text(encoding='utf-8');assert old in original
     try:
         path.write_text(original.replace(old,new,1),encoding='utf-8')

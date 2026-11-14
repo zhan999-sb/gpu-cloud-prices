@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from functools import partial
+
 import pytest
 
 from pipelines.gpu_prices import http, links, run
@@ -15,6 +17,11 @@ from pipelines.gpu_prices.providers.pages import Document
 from pipelines.gpu_prices.providers.registry import PROVIDERS
 from pipelines.gpu_prices.schema import Offer, validate_offer
 from pipelines.gpu_prices.store import PriceStore
+
+# This module tests its feature in all eight languages. The complete workload
+# matrix and its independent audit remain in test_gpu_workloads.py.
+build_site = partial(build_site, include_workloads=False)
+audit_site = partial(audit_site, require_workloads=False)
 
 NEW = ('sesterce', 'seeweb', 'gcore', 'jarvislabs', 'modal', 'koyeb')
 STAMP = '2026-11-13T04:00:00Z'

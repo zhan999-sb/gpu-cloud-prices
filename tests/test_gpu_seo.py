@@ -4,6 +4,8 @@ from pathlib import Path
 import re
 import shutil
 
+from functools import partial
+
 import pytest
 
 from pipelines.gpu_prices.audit import AuditError, Page, audit_site
@@ -12,6 +14,11 @@ from pipelines.gpu_prices.i18n import LANGUAGES, load_catalogs
 from pipelines.gpu_prices.indexnow import KEY, page_manifest
 from pipelines.gpu_prices.schema import Offer
 from pipelines.gpu_prices.store import PriceStore
+
+# This module tests its feature in all eight languages. The complete workload
+# matrix and its independent audit remain in test_gpu_workloads.py.
+build_site = partial(build_site, include_workloads=False)
+audit_site = partial(audit_site, require_workloads=False)
 
 DAY='2026-11-12'
 STAMP=DAY+'T12:00:00Z'
@@ -126,8 +133,8 @@ def test_rss_discovery_on_every_html_and_visible_dataset_mirror(seo_site):
     ('data/index.html', 'mirror-remove'), ('zh/data/index.html', 'mirror-label'),
     ('ja/data/index.html', 'mirror-url'), ('ko/data/index.html', 'mirror-hidden'),
 ])
-def test_audit_rejects_discovery_and_mirror_corruption(seo_site, filename, damage):
-    store, folder, _ = seo_site
+def test_audit_rejects_discovery_and_mirror_corruption(seo_site, filename, damage, gpu_site_copy):
+    store, folder, _ = gpu_site_copy(seo_site)
     path = folder/filename
     original = path.read_text(encoding='utf-8')
     if damage.startswith('rss-'):
@@ -161,7 +168,7 @@ def test_audit_rejects_discovery_and_mirror_corruption(seo_site, filename, damag
 ])
 def test_independent_audit_rejects_seo_corruption(seo_site,tmp_path,damage):
     store,source,_=seo_site
-    out=tmp_path/'site';shutil.copytree(source,out)
+    out=tmp_path/'site';shutil.copytree(source,out,copy_function=shutil.copy2)
     path=out/'data/index.html'
     if damage in {'buyer-intro','variant','price-block','minimum-instance','minimum-charge','hidden-minimum','block-heading'}:
         path=out/'h100-sxm-80gb/index.html'

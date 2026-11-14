@@ -8,6 +8,8 @@ from types import SimpleNamespace
 import traceback
 from urllib.error import HTTPError, URLError
 
+from functools import partial
+
 import pytest
 
 from pipelines.gpu_prices import http, links
@@ -21,6 +23,11 @@ from pipelines.gpu_prices.providers.page_collector import PageCollector, normali
 from pipelines.gpu_prices.providers.pages import ParseError, NotSupported, massedcompute, cloudclusters
 from pipelines.gpu_prices.providers.registry import PROVIDERS
 from pipelines.gpu_prices.store import PriceStore
+
+# This module tests its feature in all eight languages. The complete workload
+# matrix and its independent audit remain in test_gpu_workloads.py.
+build_site = partial(build_site, include_workloads=False)
+audit_site = partial(audit_site, require_workloads=False)
 
 FIX = Path(__file__).parent/'fixtures'/'affiliates'
 STAMP = '2026-11-12T21:30:00Z'
@@ -209,8 +216,8 @@ def test_affiliate_providers_and_monthly_prices_in_all_eight_languages(affiliate
 
 
 @pytest.mark.parametrize('old,new',[('$359.00','$0.01'),('>24</span>','>1</span>'),('nofollow noopener','sponsored nofollow noopener'),('data-monthly-quote="0"','data-monthly-quote="999"')])
-def test_audit_detects_monthly_price_term_and_affiliate_corruption(affiliate_site,old,new):
-    db,out=affiliate_site;p=out/'index.html';content=p.read_text(encoding='utf-8');assert old in content
+def test_audit_detects_monthly_price_term_and_affiliate_corruption(affiliate_site,old,new,gpu_site_copy):
+    db,out=gpu_site_copy(affiliate_site);p=out/'index.html';content=p.read_text(encoding='utf-8');assert old in content
     try:
         p.write_text(content.replace(old,new),encoding='utf-8')
         with pytest.raises(AuditError):audit_site(db,out)

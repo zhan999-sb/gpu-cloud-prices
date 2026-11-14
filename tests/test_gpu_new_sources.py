@@ -15,6 +15,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from urllib.error import HTTPError, URLError
 
+from functools import partial
+
 import pytest
 
 from pipelines.gpu_prices.providers import clore
@@ -361,6 +363,11 @@ from pipelines.gpu_prices.providers.registry import PROVIDERS
 from pipelines.gpu_prices.fx import to_usd, URL as FX_URL
 from pipelines.gpu_prices.build_site import build_site
 from pipelines.gpu_prices.audit import audit_site, AuditError, Page
+
+# This module tests its feature in all eight languages. The complete workload
+# matrix and its independent audit remain in test_gpu_workloads.py.
+build_site = partial(build_site, include_workloads=False)
+audit_site = partial(audit_site, require_workloads=False)
 from pipelines.gpu_prices.i18n import load_catalogs
 from pipelines.gpu_prices.links import link_for
 
@@ -524,7 +531,7 @@ def test_fixture_monthly_growth_below_five_megabytes():
     assert result['under_5_mb'], result
 
 
-def test_integrated_native_prices_notes_headlines_and_eight_language_audit(tmp_path):
+def test_integrated_native_prices_notes_headlines_and_eight_language_audit(tmp_path,integrated_sources_site):
     rates={'date':'2026-11-11','source':FX_URL,'rates':{'EUR':1,'USD':1.1,'CNY':7.9}}
     rows=[to_usd(o,rates) for name in ('clore','anygpu','ai_galaxy') for o in integrated(name)]
     member=next(o for o in rows if o.provider=='anygpu' and o.gpu_model_raw=='RTX 4090')
@@ -533,29 +540,36 @@ def test_integrated_native_prices_notes_headlines_and_eight_language_audit(tmp_p
     assert member.gpu_count is member.price_per_gpu_hour is None
     galaxy_4090={o.gpu_model for o in rows if o.provider=='ai_galaxy' and o.gpu_model_raw=='RTX 4090'}
     assert galaxy_4090=={'RTX 4090 24GB','RTX 4090 48GB'}
-    with PriceStore(':memory:') as store:
-        store.upsert(rows)
-        result=build_site(store,tmp_path,today='2026-11-12',built_at=STAMP)
-        assert result['audit']['status']=='passed'
-        page=Page((tmp_path/'index.html').read_text(encoding='utf-8'))
-        headlines=[c for c in page.cards if c['attrs']['data-list']=='cheapest']
-        assert headlines and {c['attrs']['data-provider'] for c in headlines}=={'clore'}
-        assert any(c['attrs']['data-price-type']=='on_demand' for c in headlines)
-        assert any(c['attrs']['data-price-type']=='spot' and 'Spot' in c['roles']['offer-badges'] for c in headlines)
-        assert 'Community marketplace' in page.text
-        assert 'USD (stablecoin) \u2022 platform fees may apply' in page.text
-        assert 'promo floor price' in page.text
-        assert 'CNY 2.24/hr' in page.text
-        assert audit_site(store.connection,tmp_path)['status']=='passed'
+    store,tmp_path,result=integrated_sources_site
+    assert result['audit']['status']=='passed'
+    page=Page((tmp_path/'index.html').read_text(encoding='utf-8'))
+    headlines=[c for c in page.cards if c['attrs']['data-list']=='cheapest']
+    assert headlines and {c['attrs']['data-provider'] for c in headlines}=={'clore'}
+    assert any(c['attrs']['data-price-type']=='on_demand' for c in headlines)
+    assert any(c['attrs']['data-price-type']=='spot' and 'Spot' in c['roles']['offer-badges'] for c in headlines)
+    assert 'Community marketplace' in page.text
+    assert 'USD (stablecoin) \u2022 platform fees may apply' in page.text
+    assert 'promo floor price' in page.text
+    assert 'CNY 2.24/hr' in page.text
+    assert audit_site(store.connection,tmp_path)['status']=='passed'
+
+
+@pytest.fixture(scope='module')
+def integrated_sources_site(tmp_path_factory):
+    folder=tmp_path_factory.mktemp('integrated_sources_site')
+    rates={'date':'2026-11-11','source':FX_URL,'rates':{'EUR':1,'USD':1.1,'CNY':7.9}}
+    rows=[to_usd(o,rates) for name in ('clore','anygpu','ai_galaxy') for o in integrated(name)]
+    store=PriceStore(':memory:')
+    store.upsert(rows)
+    result = build_site(store,folder,today='2026-11-12',built_at=STAMP)
+    yield store,folder,result
+    store.close()
 
 
 @pytest.mark.parametrize('corrupt', ['daily','gpu','fx','floor','marketplace_label'])
-def test_independent_audit_rejects_new_source_corruption(tmp_path, corrupt):
-    rates={'date':'2026-11-11','source':FX_URL,'rates':{'EUR':1,'USD':1.1,'CNY':7.9}}
-    rows=[to_usd(o,rates) for name in ('clore','anygpu','ai_galaxy') for o in integrated(name)]
-    with PriceStore(':memory:') as store:
-        store.upsert(rows)
-        build_site(store,tmp_path,today='2026-11-12',built_at=STAMP)
+def test_independent_audit_rejects_new_source_corruption(tmp_path, corrupt,integrated_sources_site,gpu_site_copy):
+    store,tmp_path,_=gpu_site_copy(integrated_sources_site)
+    with store:
         if corrupt=='daily':
             store.connection.execute("UPDATE offers SET price_per_day=price_per_day*2 WHERE provider='clore'")
         elif corrupt=='gpu':

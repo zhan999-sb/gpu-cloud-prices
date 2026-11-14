@@ -590,8 +590,8 @@ def test_localized_headline_units_precision_and_number_literals(site):
                 assert 'workload:tp_rule' not in page.search_values and 'workload:check_interconnect' not in page.search_values
 
 
-def test_audit_policy_cannot_be_disabled_by_manifest(site):
-    store,out,_=site;p=out/'gpu-prices-manifest.json';original=p.read_text(encoding='utf-8')
+def test_audit_policy_cannot_be_disabled_by_manifest(site,gpu_site_copy):
+    store,out,_=gpu_site_copy(site);p=out/'gpu-prices-manifest.json';original=p.read_text(encoding='utf-8')
     try:
         manifest=json.loads(original);manifest['include_workloads']=False
         p.write_text(json.dumps(manifest),encoding='utf-8')

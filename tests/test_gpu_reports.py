@@ -6,6 +6,8 @@ import re
 import shutil
 import xml.etree.ElementTree as ET
 
+from functools import partial
+
 import pytest
 
 from pipelines.gpu_prices import reports
@@ -15,6 +17,11 @@ from pipelines.gpu_prices.i18n import LANGUAGES, load_catalogs
 from pipelines.gpu_prices.report_audit import snapshot as audit_snapshot
 from pipelines.gpu_prices.schema import Offer
 from pipelines.gpu_prices.store import PriceStore
+
+# This module tests its feature in all eight languages. The complete workload
+# matrix and its independent audit remain in test_gpu_workloads.py.
+build_site = partial(build_site, include_workloads=False)
+audit_site = partial(audit_site, require_workloads=False)
 
 DAY='2026-11-13'
 STAMP=DAY+'T12:00:00Z'
@@ -210,7 +217,7 @@ def test_audit_independent_of_feature_code(weekly_site,monkeypatch):
 ])
 def test_audit_rejects_fabricated_or_hidden_report_content(weekly_site,tmp_path,damage):
     store,source,_=weekly_site
-    out=tmp_path/'site';shutil.copytree(source,out)
+    out=tmp_path/'site';shutil.copytree(source,out,copy_function=shutil.copy2)
     path=out/'reports/2026-W46/index.html'
     raw=path.read_text(encoding='utf-8')
     if damage=='price':raw=raw.replace('$2.00','$0.01',1)

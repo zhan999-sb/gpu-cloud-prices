@@ -6,6 +6,8 @@ import re
 import shutil
 import xml.etree.ElementTree as ET
 
+from functools import partial
+
 import pytest
 
 from pipelines.gpu_prices import guides
@@ -15,6 +17,11 @@ from pipelines.gpu_prices.guide_specs import GUIDES, REFERENCE_MODELS, reference
 from pipelines.gpu_prices.i18n import LANGUAGES, load_catalogs
 from pipelines.gpu_prices.schema import Offer
 from pipelines.gpu_prices.store import PriceStore
+
+# This module tests its feature in all eight languages. The complete workload
+# matrix and its independent audit remain in test_gpu_workloads.py.
+build_site = partial(build_site, include_workloads=False)
+audit_site = partial(audit_site, require_workloads=False)
 
 DAY='2026-11-13'
 STAMP=DAY+'T08:00:00Z'
@@ -173,7 +180,7 @@ def test_audit_does_not_import_renderer_statistics(guide_site,monkeypatch):
 ])
 def test_strict_audit_rejects_changed_guides(guide_site,tmp_path,damage):
     store,source,_=guide_site
-    out=tmp_path/'site';shutil.copytree(source,out)
+    out=tmp_path/'site';shutil.copytree(source,out,copy_function=shutil.copy2)
     slug='cheapest-gpu-per-vram-gb'
     if damage=='discount':slug='spot-vs-on-demand'
     if damage in {'weight','source','source-label','explanation'}:slug='choose-gpu-cloud-llm-inference'
@@ -214,8 +221,8 @@ def test_strict_audit_rejects_changed_guides(guide_site,tmp_path,damage):
     with pytest.raises(AuditError):audit_site(store.connection,out)
 
 
-def test_audit_rejects_forged_model_reference(guide_site):
-    store,out,_=guide_site
+def test_audit_rejects_forged_model_reference(guide_site,gpu_site_copy):
+    store,out,_=gpu_site_copy(guide_site)
     store.connection.execute("UPDATE guide_reference_models SET parameters_billions=8 WHERE model='Llama 2 7B'")
     try:
         with pytest.raises(ValueError,match='guide reference database'):reference_rows(store.connection)

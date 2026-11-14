@@ -1155,11 +1155,20 @@ def test_no_zero_or_negative_spot_discount_is_published(tmp_path, spot):
     assert not re.search(r'(?:0\.00%|-\d+(?:\.\d+)?%)', text)
 
 
+@pytest.fixture(scope='module')
+def published_numbers_site(tmp_path_factory):
+    folder=tmp_path_factory.mktemp('published_numbers_site')
+    store=PriceStore(':memory:')
+    store.upsert([offer(), offer(price_type="spot", price_per_hour=8, price_per_gpu_hour=1)])
+    result = build_site(store, folder, today=TODAY, built_at=STAMP)
+    yield store,folder,result
+    store.close()
+
+
 @pytest.mark.parametrize("damage", ["price", "title", "metadata", "faq", "json", "bar", "unmarked", "missing"])
-def test_independent_audit_rejects_corrupt_published_numbers(tmp_path, damage):
-    with PriceStore(":memory:") as store:
-        store.upsert([offer(), offer(price_type="spot", price_per_hour=8, price_per_gpu_hour=1)])
-        build_site(store, tmp_path, today=TODAY, built_at=STAMP)
+def test_independent_audit_rejects_corrupt_published_numbers(tmp_path, damage,published_numbers_site,gpu_site_copy):
+    store,tmp_path,_=gpu_site_copy(published_numbers_site)
+    with store:
         path = tmp_path / "h100-sxm-80gb/index.html"
         text = path.read_text(encoding="utf-8")
         if damage == "json":
@@ -1512,11 +1521,20 @@ def test_capped_home_keeps_fractional_group_and_native_prices_are_not_usd(tmp_pa
     assert not any(c['attrs']['data-gpu-model']=='L4 24GB' and c['attrs']['data-list']=='cheapest' for c in home.cards)
 
 
+@pytest.fixture(scope='module')
+def offer_card_site(tmp_path_factory):
+    folder=tmp_path_factory.mktemp('offer_card_site')
+    store=PriceStore(':memory:')
+    store.upsert([offer(provider='verda',region=None,gpu_count=2,price_scope='per_gpu',price_per_hour=.406,price_per_gpu_hour=.406)])
+    result = build_site(store,folder,today=TODAY,built_at=STAMP)
+    yield store,folder,result
+    store.close()
+
+
 @pytest.mark.parametrize('damage',['selection','currency','region','clock','sort','cta','badge','derived-total'])
-def test_audit_rejects_corrupt_offer_card_semantics(tmp_path,damage):
-    with PriceStore(':memory:') as store:
-        store.upsert([offer(provider='verda',region=None,gpu_count=2,price_scope='per_gpu',price_per_hour=.406,price_per_gpu_hour=.406)])
-        build_site(store,tmp_path,today=TODAY,built_at=STAMP)
+def test_audit_rejects_corrupt_offer_card_semantics(tmp_path,damage,offer_card_site,gpu_site_copy):
+    store,tmp_path,_=gpu_site_copy(offer_card_site)
+    with store:
         home=tmp_path/'index.html';original=home.read_text(encoding='utf-8')
         before,after={
             'selection':('data-list="cheapest"','data-list="offers"'),
@@ -1702,14 +1720,23 @@ def test_lambda_effective_boundary_and_all_page_rows_across_eight_languages(tmp_
         assert after['offers_today'] == 22 and after['audit']['status'] == 'passed'
 
 
-@pytest.mark.parametrize('damage', ['component', 'tier', 'conditions', 'unknown-rate'])
-def test_independent_audit_detects_page_price_qualifier_corruption(tmp_path, damage):
+@pytest.fixture(scope='module')
+def price_qualifier_site(tmp_path_factory):
+    folder=tmp_path_factory.mktemp('price_qualifier_site')
     rows = [fixture_page_offers('nebius')[0], fixture_page_offers('paperspace')[0]]
     conditional = next(o for o in fixture_page_offers('paperspace') if o.price_type == 'reserved')
     rows.append(conditional)
-    with PriceStore(':memory:') as store:
-        store.upsert(rows)
-        build_site(store, tmp_path, today=TODAY, built_at=STAMP)
+    store=PriceStore(':memory:')
+    store.upsert(rows)
+    result = build_site(store, folder, today=TODAY, built_at=STAMP)
+    yield store,folder,result
+    store.close()
+
+
+@pytest.mark.parametrize('damage', ['component', 'tier', 'conditions', 'unknown-rate'])
+def test_independent_audit_detects_page_price_qualifier_corruption(tmp_path, damage,price_qualifier_site,gpu_site_copy):
+    store,tmp_path,_=gpu_site_copy(price_qualifier_site)
+    with store:
         home = tmp_path/'index.html'
         text = home.read_text(encoding='utf-8')
         old, new = {
@@ -1729,3 +1756,119 @@ def test_fx_missing_cny_rate_keeps_native_instance_price():
     original = fixture_page_offers('featurize')[0]
     rates = {'date': '2026-11-11', 'source': URL, 'rates': {'EUR': 1, 'USD': 1.2}}
     assert to_usd(original, rates) == original
+
+
+
+def test_session_parser_cache_keeps_state_private_and_observes_changed_text():
+    raw = '<h1>Title</h1><meta name="description" content="first"><p data-search="sample">Value</p>'
+    first, second = Page(raw), Page(raw)
+    assert first.__dict__ == second.__dict__
+    first.metadata['description'] = 'mutated'
+    first.search_values['sample'] = 'mutated'
+    first.feed('<p data-search="added">Later</p>')
+    fresh = Page(raw)
+    assert second.metadata == fresh.metadata == {'description': 'first'}
+    assert second.search_values == fresh.search_values == {'sample': 'Value'}
+    assert Page(raw.replace('Value', 'Changed')).search_values == {'sample': 'Changed'}
+
+
+def test_session_parser_cache_bypasses_subclasses_and_preserves_rejections():
+    class CountingPage(Page):
+        calls = 0
+
+        def handle_data(self, data):
+            type(self).calls += 1
+            super().handle_data(data)
+
+    raw = '<h1>Title</h1>'
+    first = CountingPage(raw)
+    calls = CountingPage.calls
+    second = CountingPage(raw)
+    assert first.h1 == second.h1 == ['Title']
+    assert calls > 0 and CountingPage.calls == 2 * calls
+    for _ in range(2):
+        with pytest.raises(AuditError, match='visible'):
+            Page('<p hidden data-search="sample">Hidden</p>')
+
+
+def test_session_placeholder_cache_returns_private_sets_and_validates_bad_templates():
+    from pipelines.gpu_prices import i18n
+    fields = i18n.placeholders('{model}: {price}')
+    fields.clear()
+    assert i18n.placeholders('{model}: {price}') == {'model', 'price'}
+    for _ in range(2):
+        with pytest.raises(ValueError, match='Invalid translation placeholder'):
+            i18n.placeholders('{model.name}')
+
+
+@pytest.mark.parametrize('backing', ['memory', 'file'])
+def test_private_gpu_site_copy_isolates_files_and_sql(tmp_path, gpu_site_copy, backing):
+    folder = tmp_path/'source'
+    folder.mkdir()
+    (folder/'index.html').write_text('original', encoding='utf-8')
+    db = ':memory:' if backing == 'memory' else tmp_path/'source.sqlite'
+    with PriceStore(db) as source:
+        source.upsert([offer()])
+        site = (source, folder, {'audit': {'status': 'passed'}}) if backing == 'memory' else (db, folder)
+        copy = gpu_site_copy(site)
+        (copy[1]/'index.html').write_text('corrupted', encoding='utf-8')
+        if backing == 'memory':
+            copy[0].connection.execute('DELETE FROM offers')
+            copy[2]['audit']['status'] = 'mutated'
+            assert site[2]['audit']['status'] == 'passed'
+        else:
+            with PriceStore(copy[0]) as writable:
+                writable.connection.execute('DELETE FROM offers')
+        assert source.connection.execute('SELECT COUNT(*) FROM offers').fetchone()[0] == 1
+        assert (folder/'index.html').read_text(encoding='utf-8') == 'original'
+
+
+@pytest.mark.parametrize('newline', [None, '\n', '\r\n'])
+def test_session_file_cache_matches_real_utf8_newlines_and_atomic_moves(tmp_path, newline):
+    path = tmp_path/'page.html.tmp'
+    path.write_text('one\r\ntwo\rthree\n', encoding='utf-8', newline=newline)
+    with path.open('r', encoding='utf-8') as stream:
+        actual = stream.read()
+    assert path.read_text(encoding='utf-8') == actual
+    moved = path.replace(tmp_path/'page.html')
+    assert moved.read_text(encoding='utf-8') == actual
+    with moved.open('r', encoding='utf-8') as stream:
+        assert moved.read_text(encoding='utf-8') == stream.read()
+    with pytest.raises(FileNotFoundError):
+        path.read_text(encoding='utf-8')
+
+
+@pytest.mark.parametrize('copier', ['copyfile', 'copy2'])
+def test_session_file_cache_observes_copy_writers_metadata_and_removal(tmp_path, copier):
+    import os
+    import shutil
+    source, copy = tmp_path/'original.html', tmp_path/'copy.html'
+    source.write_text('first', encoding='utf-8')
+    getattr(shutil, copier)(source, copy)
+    assert copy.read_text(encoding='utf-8') == 'first'
+    with copy.open('r', encoding='utf-8') as stream:
+        assert copy.read_text(encoding='utf-8') == stream.read()
+    stamp = copy.stat()
+    with open(copy, 'w', encoding='utf-8') as stream:
+        stream.write('other')
+        stream.flush()
+        assert copy.read_text(encoding='utf-8') == 'other'
+        stream.seek(0)
+        stream.write('third')
+        stream.flush()
+        assert copy.read_text(encoding='utf-8') == 'third'
+    os.utime(copy, ns=(stamp.st_atime_ns, stamp.st_mtime_ns))
+    assert copy.read_text(encoding='utf-8') == 'third'
+    assert source.read_text(encoding='utf-8') == 'first'
+    descriptor = os.open(copy, os.O_WRONLY | os.O_TRUNC)
+    try:
+        os.write(descriptor, b'fresh')
+    finally:
+        os.close(descriptor)
+    os.utime(copy, ns=(stamp.st_atime_ns, stamp.st_mtime_ns+2_000_000_000))
+    assert copy.read_text(encoding='utf-8') == 'fresh'
+    copy.unlink()
+    with pytest.raises(FileNotFoundError):
+        copy.read_text(encoding='utf-8')
+    copy.write_text('new', encoding='utf-8')
+    assert copy.read_text(encoding='utf-8') == 'new'

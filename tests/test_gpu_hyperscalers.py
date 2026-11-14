@@ -9,6 +9,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from urllib.error import URLError
 
+from functools import partial
+
 import pytest
 
 from pipelines.gpu_prices import http
@@ -21,6 +23,11 @@ from pipelines.gpu_prices.providers.registry import PROVIDERS
 from pipelines.gpu_prices.regions import eligible, region_class
 from pipelines.gpu_prices.schema import parse_utc
 from pipelines.gpu_prices.store import PriceStore
+
+# This module tests its feature in all eight languages. The complete workload
+# matrix and its independent audit remain in test_gpu_workloads.py.
+build_site = partial(build_site, include_workloads=False)
+audit_site = partial(audit_site, require_workloads=False)
 
 ROOT = Path(__file__).parent / 'fixtures/hyperscalers'
 STAMP = '2026-11-13T00:00:00Z'
